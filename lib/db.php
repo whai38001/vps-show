@@ -1,6 +1,10 @@
 <?php
-// Load configuration (single source)
-require_once __DIR__ . '/config.php';
+// Load configuration (prefer local, fallback to example for fresh clones)
+if (is_file(__DIR__ . '/config.php')) {
+    require_once __DIR__ . '/config.php';
+} else {
+    require_once __DIR__ . '/config.example.php';
+}
 
 function get_pdo(): PDO {
     static $pdo = null;
