@@ -92,6 +92,7 @@ function i18n_messages(string $lang): array {
         'copy' => '复制',
         'export_csv' => '导出CSV',
         'copied' => '已复制',
+        'details' => '详情',
         // Stock labels
         'in_stock' => '有货',
         'out_of_stock' => '无货',
@@ -161,6 +162,7 @@ function i18n_messages(string $lang): array {
         'copy' => 'Copy',
         'export_csv' => 'Export CSV',
         'copied' => 'Copied',
+        'details' => 'Details',
         // Stock labels
         'in_stock' => 'In stock',
         'out_of_stock' => 'Out of stock',

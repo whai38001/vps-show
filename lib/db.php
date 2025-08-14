@@ -1,4 +1,5 @@
 <?php
+// Load configuration (single source)
 require_once __DIR__ . '/config.php';
 
 function get_pdo(): PDO {
@@ -82,6 +83,7 @@ function db_init_schema(): void {
         subtitle VARCHAR(191) NULL,
         price DECIMAL(10,2) NOT NULL,
         price_duration ENUM('per month', 'per year', 'one-time') DEFAULT 'per year',
+        details_url VARCHAR(255) NULL,
         order_url VARCHAR(255) NULL,
         location VARCHAR(255) NULL,
         features JSON NULL,
@@ -107,6 +109,7 @@ function db_init_schema(): void {
         $existing = array_fill_keys(array_map(function($r){ return (string)$r['COLUMN_NAME']; }, $cols->fetchAll()), true);
         $alters = [];
         if (!isset($existing['cpu'])) { $alters[] = 'ADD COLUMN cpu VARCHAR(191) NULL'; }
+        if (!isset($existing['details_url'])) { $alters[] = 'ADD COLUMN details_url VARCHAR(255) NULL'; }
         if (!isset($existing['ram'])) { $alters[] = 'ADD COLUMN ram VARCHAR(191) NULL'; }
         if (!isset($existing['storage'])) { $alters[] = 'ADD COLUMN storage VARCHAR(191) NULL'; }
         if (!isset($existing['cpu_cores'])) { $alters[] = 'ADD COLUMN cpu_cores DECIMAL(5,2) NULL'; }

@@ -33,7 +33,7 @@ $csrf = auth_get_csrf_token();
   <div class="container maxw420">
     <div class="header">
       <div class="brand">
-        <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f511.png" alt="login">
+        <img src="../assets/emoji/key.svg" alt="login" width="36" height="36">
         <h1>管理员登录</h1>
       </div>
       <div><a class="btn" href="../">返回首页</a></div>

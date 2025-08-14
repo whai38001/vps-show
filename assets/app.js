@@ -1,4 +1,18 @@
 (function(){
+  // Theme init (CSP safe)
+  try{
+    var savedTheme = localStorage.getItem('theme');
+    if(savedTheme){ document.documentElement.classList.toggle('light', savedTheme === 'light'); }
+    document.addEventListener('DOMContentLoaded', function(){
+      var themeBtn = document.getElementById('theme-toggle');
+      if(themeBtn){
+        themeBtn.addEventListener('click', function(){
+          var isLight = document.documentElement.classList.toggle('light');
+          try{ localStorage.setItem('theme', isLight ? 'light' : 'dark'); }catch(e){}
+        });
+      }
+    });
+  }catch(e){}
   function onScroll(){
     var nav = document.querySelector('.topnav');
     if(!nav) return;
@@ -366,4 +380,15 @@
   window.addEventListener('resize', onResize);
   window.addEventListener('orientationchange', onResize);
   document.addEventListener('DOMContentLoaded', function(){ onResize(); onScroll(); initCompare(); initCspSafeAutoSubmit(); initCspSafeConfirm(); });
+  // Back-to-top binding
+  try{
+    document.addEventListener('DOMContentLoaded', function(){
+      var wrap = document.getElementById('back-to-top'); if(!wrap) return;
+      var btn = wrap.querySelector('button');
+      var onScroll2 = function(){ wrap.style.display = (window.scrollY > 240) ? 'block' : 'none'; };
+      window.addEventListener('scroll', onScroll2, {passive:true});
+      onScroll2();
+      btn && btn.addEventListener('click', function(){ window.scrollTo({ top: 0, behavior: 'smooth' }); });
+    });
+  }catch(e){}
 })();

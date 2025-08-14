@@ -20,5 +20,10 @@ function render_site_footer(): void {
         </div>
       </div>
     </footer>
+    <div id="back-to-top"><button class="btn btn-secondary" type="button" aria-label="Back to top" title="返回顶部">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M12 5l-7 7h4v7h6v-7h4l-7-7z"/>
+      </svg>
+    </button></div>
     <?php
 }
