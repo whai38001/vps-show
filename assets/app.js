@@ -99,9 +99,9 @@
         var tr = document.createElement('tr');
         tr.innerHTML = ''+
           '<td>'+
-            '<div style="display:flex;align-items:center;gap:8px;">'+
-              (p.logoSrc ? '<img src="'+p.logoSrc+'" alt="" style="width:20px;height:20px;border-radius:4px;">' : '')+
-              '<div><div style="font-weight:700;">'+escapeHtml(p.title)+'</div><div class="small muted">'+escapeHtml(p.vendor)+'</div></div>'+
+            '<div class="row items-center gap8">'+
+              (p.logoSrc ? '<img src="'+p.logoSrc+'" alt="" class="logo-xs">' : '')+
+              '<div><div class="fw700">'+escapeHtml(p.title)+'</div><div class="small muted">'+escapeHtml(p.vendor)+'</div></div>'+
             '</div>'+
           '</td>'+
           '<td>'+escapeHtml(p.price)+' <span class="small muted">'+escapeHtml(p.duration)+'</span></td>'+
@@ -324,8 +324,46 @@
     updateBar();
     syncCardCheckboxes();
   }
+  function initCspSafeAutoSubmit(){
+    try{
+      document.addEventListener('change', function(e){
+        var target = e.target;
+        if(!(target instanceof HTMLSelectElement)) return;
+        if(!target.classList.contains('js-auto-submit')) return;
+        var form = target.form;
+        if(form){
+          // Reset page to 1 when per-page or filter changes
+          var pageInput = form.querySelector('input[type="number"]');
+          if(pageInput){ try{ pageInput.value = '1'; }catch(_e){} }
+          form.submit();
+        }
+      });
+      // Clear search button (front page)
+      document.addEventListener('click', function(e){
+        var t = e.target;
+        if(!(t instanceof HTMLElement)) return;
+        if(!t.matches('[data-clear-search]')) return;
+        var form = t.closest('form'); if(!form) return;
+        var input = form.querySelector('input[name="q"]'); if(!input) return;
+        input.value = '';
+        form.submit();
+      });
+    }catch(e){}
+  }
+  function initCspSafeConfirm(){
+    try{
+      document.addEventListener('submit', function(e){
+        var form = e.target;
+        if(!(form instanceof HTMLFormElement)) return;
+        var msg = form.getAttribute('data-confirm');
+        if(msg && !window.confirm(msg)){
+          e.preventDefault();
+        }
+      });
+    }catch(e){}
+  }
   window.addEventListener('scroll', onScroll, {passive:true});
   window.addEventListener('resize', onResize);
   window.addEventListener('orientationchange', onResize);
-  document.addEventListener('DOMContentLoaded', function(){ onResize(); onScroll(); initCompare(); });
+  document.addEventListener('DOMContentLoaded', function(){ onResize(); onScroll(); initCompare(); initCspSafeAutoSubmit(); initCspSafeConfirm(); });
 })();

@@ -62,9 +62,9 @@ server {
     index index.php index.html;
 
     # 安全配置
-    add_header X-Frame-Options DENY;
+    add_header X-Frame-Options SAMEORIGIN;
     add_header X-Content-Type-Options nosniff;
-    add_header X-XSS-Protection "1; mode=block";
+    # 前端 CSP 已由应用层发送，无需在 Nginx 再下发重复/冲突配置
 
     # 主路由
     location / {
@@ -202,6 +202,46 @@ iostat -x 1
    - 启用 Nginx 静态文件缓存
    - 配置 CDN（如 CloudFlare）
    - 考虑 Redis 缓存热点数据
+
+### 日志轮转（logrotate）
+
+为库存任务与 PHP 错误日志配置轮转，限制总占用 ≤ 100MB。
+
+```bash
+sudo tee /etc/logrotate.d/vps-deals <<'EOF'
+/opt/1panel/www/sites/vs.140581.xyz/index/log/stock_cron.log
+/opt/1panel/www/sites/vs.140581.xyz/index/log/php-error.log
+{
+  size 10M
+  rotate 10
+  missingok
+  notifempty
+  compress
+  delaycompress
+  dateext
+  create 0640 root root
+  su root root
+
+  postrotate
+    dir="/opt/1panel/www/sites/vs.140581.xyz/index/log"
+    limit=$((100*1024*1024))
+    files=$(ls -1 ${dir}/stock_cron.log* ${dir}/php-error.log* 2>/dev/null || true)
+    [ -z "$files" ] && exit 0
+    total=$(echo "$files" | xargs -r du -b 2>/dev/null | awk '{s+=$1} END{print s+0}')
+    while [ "${total:-0}" -gt "$limit" ]; do
+      oldest=$(echo "$files" | xargs -r ls -1t 2>/dev/null | tail -n 1)
+      [ -n "$oldest" ] && rm -f "$oldest" || break
+      files=$(ls -1 ${dir}/stock_cron.log* ${dir}/php-error.log* 2>/dev/null || true)
+      total=$(echo "$files" | xargs -r du -b 2>/dev/null | awk '{s+=$1} END{print s+0}')
+    done
+  endscript
+}
+EOF
+
+sudo logrotate -f /etc/logrotate.d/vps-deals
+```
+
+确保系统的 logrotate 定时任务（或 `logrotate.timer`）处于启用状态。
 
 ### 安全加固
 1. **防火墙配置**：

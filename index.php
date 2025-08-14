@@ -16,6 +16,7 @@ send_common_security_headers();
 $q = isset($_GET['q']) ? trim($_GET['q']) : '';
 $vendorId = isset($_GET['vendor']) ? (int)$_GET['vendor'] : 0;
 $billing = isset($_GET['billing']) ? trim($_GET['billing']) : '';
+$stock = isset($_GET['stock']) ? trim($_GET['stock']) : '';
 $minPrice = isset($_GET['min_price']) ? (float)$_GET['min_price'] : 0;
 $maxPrice = isset($_GET['max_price']) ? (float)$_GET['max_price'] : 0;
 $location = isset($_GET['location']) ? trim($_GET['location']) : '';
@@ -68,6 +69,10 @@ if ($billing !== '' && in_array($billing, ['per month','per year','one-time'], t
     $where[] = 'p.price_duration = :billing';
     $params[':billing'] = $billing;
 }
+if ($stock !== '' && in_array($stock, ['in','out','unknown'], true)) {
+    $where[] = 'p.stock_status = :stock';
+    $params[':stock'] = $stock;
+}
 if ($minPrice > 0) {
     $where[] = 'p.price >= :min_price';
     $params[':min_price'] = $minPrice;
@@ -111,6 +116,7 @@ $plans = $stmt->fetchAll();
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <title><?= htmlspecialchars(t('site_title')) ?></title>
   <link rel="stylesheet" href="assets/style.css">
   <script defer src="assets/app.js"></script>
@@ -136,26 +142,45 @@ $plans = $stmt->fetchAll();
         <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f680.png" alt="logo">
         <h1><?= htmlspecialchars(t('site_title')) ?></h1>
       </div>
-      <form class="search" method="get">
+      <form class="search row items-center gap8" method="get">
         <input type="text" name="q" value="<?= htmlspecialchars($q) ?>" placeholder="<?= htmlspecialchars(t('search_placeholder')) ?>">
+        <?php if ($q !== ''): ?>
+          <button class="btn btn-secondary btn-small" type="button" data-clear-search>清空</button>
+        <?php endif; ?>
       </form>
     </header>
 
     <div class="filters">
       <form method="get">
-        <select name="vendor" onchange="this.form.submit()">
+        <select name="vendor" class="js-auto-submit">
           <option value="0"><?= htmlspecialchars(t('filters_all_vendors')) ?></option>
           <?php foreach ($vendors as $v): ?>
             <option value="<?= (int)$v['id'] ?>" <?= $vendorId===(int)$v['id']?'selected':'' ?>><?= htmlspecialchars($v['name']) ?></option>
           <?php endforeach; ?>
         </select>
-        <select name="billing" onchange="this.form.submit()">
+        <?php
+          // Quick toggle: Only in-stock
+          $qsIn = $_GET; $qsIn['stock'] = 'in';
+          $qsAll = $_GET; unset($qsAll['stock']);
+          $hrefIn = '?' . http_build_query($qsIn);
+          $hrefAll = '?' . http_build_query($qsAll);
+          $isIn = ($stock === 'in');
+        ?>
+        <a class="btn <?= $isIn ? '' : 'btn-secondary' ?>" href="<?= htmlspecialchars($hrefIn) ?>"><?= htmlspecialchars(t('in_stock')) ?></a>
+        <a class="btn <?= $stock === '' ? '' : 'btn-secondary' ?>" href="<?= htmlspecialchars($hrefAll) ?>"><?= htmlspecialchars(t('filters_all_stock')) ?></a>
+        <select name="billing" class="js-auto-submit">
           <option value=""><?= htmlspecialchars(t('filters_all_billing')) ?></option>
           <?php foreach (['per month'=>t('billing_per_month'),'per year'=>t('billing_per_year'),'one-time'=>t('billing_one_time')] as $k=>$label): ?>
             <option value="<?= $k ?>" <?= $billing===$k?'selected':'' ?>><?= htmlspecialchars($label) ?></option>
           <?php endforeach; ?>
         </select>
-        <select name="sort" onchange="this.form.submit()">
+        <select name="stock" class="js-auto-submit">
+          <option value=""><?= htmlspecialchars(t('filters_all_stock')) ?></option>
+          <option value="in" <?= $stock==='in'?'selected':'' ?>><?= htmlspecialchars(t('in_stock')) ?></option>
+          <option value="out" <?= $stock==='out'?'selected':'' ?>><?= htmlspecialchars(t('out_of_stock')) ?></option>
+          <option value="unknown" <?= $stock==='unknown'?'selected':'' ?>><?= htmlspecialchars(t('unknown')) ?></option>
+        </select>
+        <select name="sort" class="js-auto-submit">
           <option value="default" <?= $sort==='default'?'selected':'' ?>><?= htmlspecialchars(t('sort_default')) ?></option>
           <option value="price_asc" <?= $sort==='price_asc'?'selected':'' ?>><?= htmlspecialchars(t('sort_price_asc')) ?></option>
           <option value="price_desc" <?= $sort==='price_desc'?'selected':'' ?>><?= htmlspecialchars(t('sort_price_desc')) ?></option>
@@ -172,20 +197,16 @@ $plans = $stmt->fetchAll();
         <input class="input" type="number" name="min_cpu" step="0.1" placeholder="<?= htmlspecialchars(t('input_min_cpu')) ?>" value="<?= isset($_GET['min_cpu']) && (float)$_GET['min_cpu']>0 ? htmlspecialchars((string)(float)$_GET['min_cpu']) : '' ?>">
         <input class="input" type="number" name="min_ram_gb" step="0.5" placeholder="<?= htmlspecialchars(t('input_min_ram_gb')) ?>" value="<?= isset($_GET['min_ram_gb']) && (float)$_GET['min_ram_gb']>0 ? htmlspecialchars((string)(float)$_GET['min_ram_gb']) : '' ?>">
         <input class="input" type="number" name="min_storage_gb" step="1" placeholder="<?= htmlspecialchars(t('input_min_storage_gb')) ?>" value="<?= isset($_GET['min_storage_gb']) && (int)$_GET['min_storage_gb']>0 ? htmlspecialchars((string)(int)$_GET['min_storage_gb']) : '' ?>">
-        <select name="location" onchange="this.form.submit()">
+        <select name="location" class="js-auto-submit">
           <option value=""><?= htmlspecialchars(t('label_location')) ?></option>
           <?php foreach ($locationsDistinct as $loc): ?>
             <option value="<?= htmlspecialchars($loc) ?>" <?= $location===$loc?'selected':'' ?>><?= htmlspecialchars(i18n_text($loc)) ?></option>
           <?php endforeach; ?>
         </select>
-        <select name="page_size" onchange="this.form.submit()">
-          <?php foreach ([12,24,36,48] as $opt): ?>
-            <option value="<?= $opt ?>" <?= $pageSize===$opt?'selected':'' ?>><?= htmlspecialchars(t('per_page')) ?> <?= $opt ?></option>
-          <?php endforeach; ?>
-        </select>
         <button class="btn" type="submit"><?= htmlspecialchars(t('filter_button')) ?></button>
         <?php $resetHref = '?' . http_build_query(['lang'=>i18n_current_lang()]); ?>
         <a class="btn btn-secondary" href="<?= htmlspecialchars($resetHref) ?>"><?= htmlspecialchars(t('reset')) ?></a>
+        <a class="btn btn-secondary" href="?<?= htmlspecialchars(http_build_query(['lang'=>i18n_current_lang()])) ?>">清空筛选</a>
         <?php if ($q !== ''): ?><input class="input" type="hidden" name="q" value="<?= htmlspecialchars($q) ?>"><?php endif; ?>
       </form>
     </div>
@@ -204,6 +225,17 @@ $plans = $stmt->fetchAll();
             </div>
           </div>
           <div class="card-body">
+            <?php if (isset($plan['stock_status']) && $plan['stock_status']): ?>
+              <div class="meta" title="<?= htmlspecialchars(t('stock_status')) ?>">
+                <?php if ($plan['stock_status'] === 'in'): ?>
+                  <span class="chip chip-in"><?= htmlspecialchars(t('in_stock')) ?></span>
+                <?php elseif ($plan['stock_status'] === 'out'): ?>
+                  <span class="chip chip-out"><?= htmlspecialchars(t('out_of_stock')) ?></span>
+                <?php else: ?>
+                  <span class="chip chip-unknown"><?= htmlspecialchars(t('unknown')) ?></span>
+                <?php endif; ?>
+              </div>
+            <?php endif; ?>
             <?php if (!empty($plan['location'])): ?>
               <div class="meta">📍 <?= htmlspecialchars(i18n_text((string)$plan['location'])) ?></div>
             <?php endif; ?>
@@ -231,7 +263,22 @@ $plans = $stmt->fetchAll();
               </div>
             <?php endif; ?>
             <ul class="features">
-              <?php $features = $plan['features'] ? (is_array($plan['features']) ? $plan['features'] : json_decode($plan['features'], true)) : []; ?>
+              <?php
+                // Normalize features to array of strings even if stored as raw text
+                $features = [];
+                if (!empty($plan['features'])) {
+                  if (is_array($plan['features'])) {
+                    $features = $plan['features'];
+                  } elseif (is_string($plan['features'])) {
+                    $decoded = json_decode($plan['features'], true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                      $features = $decoded;
+                    } else {
+                      $features = array_values(array_filter(array_map('trim', preg_split('/\r?\n|;|,/', $plan['features']))));
+                    }
+                  }
+                }
+              ?>
               <?php foreach ($features as $f): ?>
                 <li><?= htmlspecialchars(i18n_text((string)$f)) ?></li>
               <?php endforeach; ?>
@@ -250,9 +297,18 @@ $plans = $stmt->fetchAll();
         </article>
       <?php endforeach; ?>
       <?php if (!$plans): ?>
-        <div style="opacity:.7;">
-          <?php $seed = '<a href="scripts/seed.php">' . htmlspecialchars(t('seed_script')) . '</a>'; ?>
-          <?= str_replace('{seed_link}', $seed, t('no_data')) ?>
+        <div class="opacity-80">
+          <?php
+            $anyPlans = (int)$pdo->query('SELECT COUNT(*) FROM plans')->fetchColumn();
+            if ($anyPlans > 0) {
+              $clearHref = '?' . http_build_query(['lang'=>i18n_current_lang()]);
+              echo '<div>' . htmlspecialchars(t('no_data')) . '</div>';
+              echo '<div class="mt8"><a class="btn" href="' . htmlspecialchars($clearHref) . '">' . htmlspecialchars(t('reset')) . '</a></div>';
+            } else {
+              $seed = '<a href="scripts/seed.php">' . htmlspecialchars(t('seed_script')) . '</a>';
+              echo str_replace('{seed_link}', $seed, t('no_data'));
+            }
+          ?>
         </div>
       <?php endif; ?>
     </main>
@@ -275,9 +331,9 @@ $plans = $stmt->fetchAll();
     <div id="compare-modal" class="compare-modal hidden" aria-hidden="true" role="dialog" aria-modal="true" data-order-label="<?= htmlspecialchars(t('order_now')) ?>" data-unit-vcpu="<?= htmlspecialchars(t('unit_vcpu')) ?>" data-unit-gb="<?= htmlspecialchars(t('unit_gb')) ?>">
       <div class="modal-backdrop" data-close></div>
       <div class="modal-content" role="document">
-        <div class="modal-header">
+          <div class="modal-header">
           <h3><?= htmlspecialchars(t('compare')) ?></h3>
-          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="row items-center gap8">
             <button class="btn btn-secondary" data-copy data-copied-label="<?= htmlspecialchars(t('copied')) ?>"><?= htmlspecialchars(t('copy')) ?></button>
             <button class="btn btn-secondary" data-export><?= htmlspecialchars(t('export_csv')) ?></button>
             <button class="btn btn-secondary" data-close><?= htmlspecialchars(t('close')) ?></button>
@@ -308,9 +364,9 @@ $plans = $stmt->fetchAll();
       // Recently added: last 6 by updated_at
       $recent = $pdo->query('SELECT p.*, v.name AS vendor_name, v.logo_url FROM plans p INNER JOIN vendors v ON v.id=p.vendor_id ORDER BY p.updated_at DESC LIMIT 6')->fetchAll();
       if ($recent): ?>
-      <section style="margin-top:24px;">
-        <h2 style="margin:0 0 12px;font-size:18px;"><?= htmlspecialchars(t('recently_added')) ?></h2>
-        <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));">
+      <section class="mt24">
+        <h2 class="mb12 text-lg"><?= htmlspecialchars(t('recently_added')) ?></h2>
+        <div class="grid grid-260">
           <?php foreach ($recent as $r): ?>
             <article class="card">
               <?php if (!empty($r['highlights'])): ?><div class="ribbon"><?= htmlspecialchars(i18n_text((string)$r['highlights'])) ?></div><?php endif; ?>
@@ -334,26 +390,21 @@ $plans = $stmt->fetchAll();
       </section>
     <?php endif; ?>
     <?php if ($total > 0): ?>
-      <?php $totalPages = (int)ceil($total / $pageSize); ?>
-      <?php if ($totalPages > 1): ?>
-        <?php
-          $baseQuery = $_GET;
-          render_pagination_controls([
-            'page' => $page,
-            'total_pages' => $totalPages,
-            'total_items' => $total,
-            'base_query' => $baseQuery,
-            'page_param' => 'page',
-            'window' => 2,
-          ]);
-          render_pagination_jump_form([
-            'page' => $page,
-            'total_pages' => $totalPages,
-            'base_query' => $baseQuery,
-            'page_param' => 'page',
-          ]);
-        ?>
-      <?php endif; ?>
+      <?php $totalPages = (int)ceil($total / $pageSize); $baseQuery = $_GET; ?>
+      <?php
+        render_pagination([
+          'page' => $page,
+          'total_pages' => $totalPages,
+          'total_items' => $total,
+          'base_query' => $baseQuery,
+          'page_param' => 'page',
+          'window' => 2,
+          'per_page_options' => [12,24,36,48],
+          'per_page_param' => 'page_size',
+          'per_page_value' => $pageSize,
+          'align' => 'center',
+        ]);
+      ?>
     <?php endif; ?>
   </div>
   <?php render_site_footer(); ?>

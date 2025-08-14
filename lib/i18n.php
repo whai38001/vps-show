@@ -33,6 +33,7 @@ function i18n_messages(string $lang): array {
         'search_placeholder' => '搜索套餐或厂商',
         'filters_all_vendors' => '全部厂商',
         'filters_all_billing' => '全部周期',
+        'filters_all_stock' => '库存（全部）',
         'billing_per_month' => '月付',
         'billing_per_year' => '年付',
         'billing_one_time' => '一次性',
@@ -91,11 +92,17 @@ function i18n_messages(string $lang): array {
         'copy' => '复制',
         'export_csv' => '导出CSV',
         'copied' => '已复制',
+        // Stock labels
+        'in_stock' => '有货',
+        'out_of_stock' => '无货',
+        'unknown' => '未知',
+        'stock_status' => '库存状态',
     ];
     $EN = [
         'search_placeholder' => 'Search plans or vendors',
         'filters_all_vendors' => 'All vendors',
         'filters_all_billing' => 'All billing cycles',
+        'filters_all_stock' => 'All stock',
         'billing_per_month' => 'Monthly',
         'billing_per_year' => 'Yearly',
         'billing_one_time' => 'One-time',
@@ -154,6 +161,11 @@ function i18n_messages(string $lang): array {
         'copy' => 'Copy',
         'export_csv' => 'Export CSV',
         'copied' => 'Copied',
+        // Stock labels
+        'in_stock' => 'In stock',
+        'out_of_stock' => 'Out of stock',
+        'unknown' => 'Unknown',
+        'stock_status' => 'Stock status',
     ];
     $cache['zh'] = $ZH; $cache['en'] = $EN;
     return $cache[$lang] ?? $ZH;
@@ -340,6 +352,65 @@ function i18n_text_to_zh(string $text): string {
         '/including\s+local,\s+international,\s+and\s+IX\.?/i' => '包含本地、国际及 IX',
         // IPv6 only available in -> IPv6 仅在
         '/IPv6\s+only\s+available\s+in\b/i' => 'IPv6 仅在',
+        // Hosting panel and stack
+        '/\bDirectAdmin\s+Control\s+Panel\s+With\s+LiteSpeed\b/i' => 'DirectAdmin 控制面板 + LiteSpeed',
+        '/\bDirectAdmin\s+Control\s+Panel\b/i' => 'DirectAdmin 控制面板',
+        '/\bWith\s+LiteSpeed\b/i' => '配备 LiteSpeed',
+        // Premier services
+        '/\bFree\s+Premier\s+E-?mail\s+Delivery\s*\(MailChannels\)\b/i' => '免费高级邮件投递（MailChannels）',
+        '/\bFree\s+Premier\s+CDN\s*\(BunnyCDN\)\b/i' => '免费高级 CDN（BunnyCDN）',
+        // CPU models
+        '/\bAMD\s+Ryzen\s+([0-9]+)\s+([0-9A-Za-z-]+)\s+CPUs?\b/i' => 'AMD Ryzen $1 $2 处理器',
+        // Storage / space
+        '/\b([0-9]+)\s*GB\s*NVMe\s*Gen4\s*Web\s*Hosting\s*Space\b/i' => '$1 GB NVMe Gen4 网站空间',
+        '/\bWeb\s+Hosting\s+Space\b/i' => '网站空间',
+        // Domain quotas
+        '/\bUp\s+to\s+([0-9]+)\s+Domains?\s+and\s+([0-9]+)\s+Sub[- ]?Domains?\b/i' => '最多 $1 个主域名与 $2 个子域名',
+        // Unlimited items
+        '/\bUnlimited\s+E-?mail\s+Accounts\b/i' => '无限邮箱账户',
+        '/\bUnlimited\s+Bandwidth\b/i' => '不限带宽',
+        '/\bUnlimited\s*带宽\b/u' => '不限带宽',
+        '/\bUnlimited\s+Parked\s+Domains\b/i' => '无限停放域名',
+        '/\bUnlimited\s+Databases\b/i' => '无限数据库',
+        // Backups & SSL
+        '/\bWeekly\s+Backups?\b/i' => '每周备份',
+        '/\bWeekly\s*备份\b/u' => '每周备份',
+        '/\bFree\s+SSL\s+Certificates\b/i' => '免费 SSL 证书',
+        '/\bSSL\s+Certificates\b/i' => 'SSL 证书',
+        // Misc
+        '/\bSub[- ]?Domains?\b/i' => '子域名',
+        '/\bDomains?\b/i' => '域名',
+        // PHP versions line at start
+        '/^PHP\s+([0-9][0-9\.\/]+)\b/i' => '支持 PHP $1',
+        // Regions
+        '/\bFinland\b/i' => '芬兰',
+        // Popular -> 热门
+        '/\bPopular\b/i' => '热门',
+        // Limited Stock -> 库存有限 / 限量
+        '/\bLimited\s+Stock\b/i' => '库存有限',
+        '/\bLIMITED\s+STOCK\b/i' => '库存有限',
+        // Summer Campaign Until <date> -> 夏季促销至 <date>
+        '/\bSummer\s+Campaign\s+Until\s*/i' => '夏季促销至 ',
+        // Turbo Boost Up To 4.3 GHz -> 加速可达 4.3 GHz
+        '/\bTurbo\s+Boost\s+Up\s+To\s+([0-9]+(?:\.[0-9]+)?)\s*GHz\b/i' => '加速可达 $1 GHz',
+        // X vCore(s) -> X vCPU
+        '/\b([0-9]+)\s*vCore(s)?\b/i' => '$1 vCPU',
+        // Crypto and Illegal Not Allowed -> 禁止加密货币及非法用途
+        '/\bCrypto\s+and\s+Illegal\s+Not\s+Allowed\b/i' => '禁止加密货币及非法用途',
+        // Debian, Ubuntu and Alpine Only (x86/x64) -> 仅支持 Debian/Ubuntu/Alpine（x86/x64）
+        '/\bDebian,\s*Ubuntu\s+and\s+Alpine\s+Only\s*\(([^)]+)\)\b/i' => '仅支持 Debian/Ubuntu/Alpine（$1）',
+        '/\bDebian,\s*Ubuntu\s+and\s+Alpine\s+Only\b/i' => '仅支持 Debian/Ubuntu/Alpine',
+        // Non-Refundable / No Refund / No Backups
+        '/\bNon-Refundable\b/i' => '不退款',
+        '/\bNo\s+Refunds?\b/i' => '不退款',
+        '/\bNo\s+Backups?\b/i' => '不提供备份',
+        // Regions and countries
+        '/\bFinland\b/i' => '芬兰',
+        // ALWAYS PROMO / Black Friday
+        '/\bALWAYS\s+PROMO\b/i' => '长期促销',
+        '/\bBlack\s+Friday\b/i' => '黑五',
+        '/\bBlack\s+Friday\s+Sale\b/i' => '黑五特卖',
+        '/\bBlack\s+Friday\s+Special\b/i' => '黑五特惠',
     ];
     foreach ($patterns as $re => $rep) {
         $out = preg_replace($re, $rep, $out);
@@ -348,6 +419,21 @@ function i18n_text_to_zh(string $text): string {
     $out = preg_replace('/\s{2,}/', ' ', $out);
     // Simple glossary replacements
     $map = [
+        'Popular' => '热门',
+        'LIMITED STOCK' => '库存有限',
+        'Limited Stock' => '库存有限',
+        'ALWAYS PROMO' => '长期促销',
+        'Black Friday' => '黑五',
+        'Black Friday Sale' => '黑五特卖',
+        'Black Friday Special' => '黑五特惠',
+        'Campaign' => '促销',
+        'Until' => '至',
+        'Crypto' => '加密货币',
+        'Illegal' => '非法',
+        'Not Allowed' => '不允许',
+        'Non-Refundable' => '不退款',
+        'No Backup' => '不提供备份',
+        'No Backups' => '不提供备份',
         'HostDZire Special' => 'HostDZire 特惠',
         'Mumbai' => '孟买',
         'India' => '印度',
@@ -434,9 +520,59 @@ function i18n_text_to_zh(string $text): string {
  * Translate plan-related free text to current language (best-effort, glossary-based)
  * Only applies when current language is zh.
  */
+function i18n_text_to_en(string $text): string {
+    $out = $text;
+    // Normalize common punctuation and parentheses
+    $out = str_replace(['（','）','，','、','：'], ['(',')',', ', ', ', ': '], $out);
+    // Insert space before units like Gbps/Mbps if missing
+    $out = preg_replace('/(\d)(Gbps|Mbps)\b/i', '$1 $2', $out);
+    // \/ 月 -> / mo ; \/ 年 -> / yr
+    $out = preg_replace('/\/\s*月\b/u', '/ mo', $out);
+    $out = preg_replace('/\/\s*年\b/u', '/ yr', $out);
+    // Label words
+    $patterns = [
+        '/\b年付\b/u' => 'Yearly',
+        '/\b月付\b/u' => 'Monthly',
+        '/\b内存\b/u' => 'RAM',
+        '/\b存储\b/u' => 'Storage',
+        '/\b空间\b/u' => 'Storage',
+        '/\b流量\b/u' => 'Transfer',
+        '/\b端口\b/u' => 'port',
+        '/\b机房\/?地区\b/u' => 'Location',
+        '/\b有货\b/u' => 'In stock',
+        '/\b无货\b/u' => 'Out of stock',
+        '/\b未知\b/u' => 'Unknown',
+        // RAID casing
+        '/\bRAID\s*10\b/i' => 'RAID-10',
+        '/\bRaid\s*10\b/i' => 'RAID-10',
+    ];
+    foreach ($patterns as $re => $rep) { $out = preg_replace($re, $rep, $out); }
+
+    // City and proper nouns mapping
+    $map = [
+        '休斯顿' => 'Houston',
+        '洛杉矶' => 'Los Angeles',
+        '达拉斯' => 'Dallas',
+        '新加坡' => 'Singapore',
+        '香港' => 'Hong Kong',
+        '孟买' => 'Mumbai',
+        '芬兰' => 'Finland',
+        '美国' => 'USA',
+    ];
+    // Replace longer phrases first
+    uksort($map, function($a,$b){ return strlen($b) <=> strlen($a); });
+    foreach ($map as $zh => $en) { $out = str_replace($zh, $en, $out); }
+
+    // Normalize spec labels with colon in English
+    $out = preg_replace('/\b(vCPU|CPU|RAM|Storage|IPv4|IPv6)\s*:?\s*/i', '$1: ', $out);
+    // Normalize Ryzen model casing for x3d/x3D -> X3D
+    $out = preg_replace('/\b(ryzen\s*9\s*7950)x3d\b/i', '$1X3D', $out);
+    return $out;
+}
+
 function i18n_text(string $text): string {
-    if (i18n_current_lang() !== 'zh') {
-        return $text;
-    }
-    return i18n_text_to_zh($text);
+    $lang = i18n_current_lang();
+    if ($lang === 'zh') { return i18n_text_to_zh($text); }
+    if ($lang === 'en') { return i18n_text_to_en($text); }
+    return $text;
 }

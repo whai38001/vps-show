@@ -30,7 +30,7 @@ $csrf = auth_get_csrf_token();
   <link rel="stylesheet" href="../assets/style.css">
 </head>
 <body>
-  <div class="container" style="max-width:420px;">
+  <div class="container maxw420">
     <div class="header">
       <div class="brand">
         <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f511.png" alt="login">
@@ -39,7 +39,7 @@ $csrf = auth_get_csrf_token();
       <div><a class="btn" href="../">返回首页</a></div>
     </div>
     <?php if ($error): ?>
-      <div style="background:#231b1b;border:1px solid #5b2727;color:#fca5a5;padding:10px 12px;border-radius:8px;margin-bottom:12px;"><?= htmlspecialchars($error) ?></div>
+      <div class="alert alert-error"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
     <form method="post">
       <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
@@ -47,11 +47,11 @@ $csrf = auth_get_csrf_token();
         <label>用户名</label>
         <input class="input" type="text" name="username" autofocus required>
       </div>
-      <div style="margin-top:10px;">
+      <div class="mt10">
         <label>密码</label>
         <input class="input" type="password" name="password" required>
       </div>
-      <div style="margin-top:12px;">
+      <div class="mt12">
         <button class="btn" type="submit">登录</button>
       </div>
     </form>

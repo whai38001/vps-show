@@ -33,14 +33,14 @@ $url = isset($_GET['url']) ? trim((string)$_GET['url']) : '';
 if ($url === '') {
   header('Content-Type: text/html; charset=utf-8');
   echo '<!DOCTYPE html><meta charset="utf-8"><title>导入 URL</title>';
-  echo '<div style="font:14px/1.6 system-ui,Segoe UI,Roboto,Arial,sans-serif;padding:18px;max-width:740px;margin:0 auto;">';
+  echo '<div class="prose p18 maxw740 mx-auto">';
   echo '<h2>从 URL 导入套餐</h2>';
-  echo '<form method="get" style="display:flex;gap:8px;flex-wrap:wrap;">';
-  echo '<textarea name="urls" rows="6" placeholder="每行一个链接，可粘贴多个\nhttps://portal.orangevps.com/aff.php?aff=171&pid=271\nhttps://app.cloudcone.com/vps/...\nhttps://my.racknerd.com/...\nhttps://buyvm.net/..." style="flex:1;min-width:420px;padding:8px 10px;"></textarea>';
-  echo '<button class="btn" type="submit" style="padding:8px 14px;border:1px solid #4b5563;border-radius:8px;background:#111827;color:#e5e7eb;">批量导入</button>';
+  echo '<form method="get" class="row wrap gap8">';
+  echo '<textarea name="urls" rows="6" class="input flex1 minw420" placeholder="每行一个链接，可粘贴多个\nhttps://portal.orangevps.com/aff.php?aff=171&pid=271\nhttps://app.cloudcone.com/vps/...\nhttps://my.racknerd.com/...\nhttps://buyvm.net/..."></textarea>';
+  echo '<button class="btn" type="submit">批量导入</button>';
   echo '</form>';
-  echo '<p style="opacity:.75;margin-top:10px;">目前支持：CloudCone、RackNerd、BuyVM、OrangeVPS（尽力解析）。</p>';
-  echo '<p style="opacity:.75;margin-top:10px;">或使用单个链接参数：?url=...</p>';
+  echo '<p class="small muted mt10">目前支持：CloudCone、RackNerd、BuyVM、OrangeVPS（尽力解析）。</p>';
+  echo '<p class="small muted mt10">或使用单个链接参数：?url=...</p>';
   echo '</div>';
   exit;
 }

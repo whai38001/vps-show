@@ -24,6 +24,7 @@ if (!rate_limit_allow('api_plans:' . $ip, 120, 60)) {
 $q = isset($_GET['q']) ? trim($_GET['q']) : '';
 $vendorId = isset($_GET['vendor']) ? (int)$_GET['vendor'] : 0;
 $billing = isset($_GET['billing']) ? trim($_GET['billing']) : '';
+$stock = isset($_GET['stock']) ? trim($_GET['stock']) : '';
 $minPrice = isset($_GET['min_price']) ? (float)$_GET['min_price'] : 0;
 $maxPrice = isset($_GET['max_price']) ? (float)$_GET['max_price'] : 0;
 $location = isset($_GET['location']) ? trim($_GET['location']) : '';
@@ -69,6 +70,10 @@ if ($vendorId > 0) {
 if ($billing !== '' && in_array($billing, ['per month','per year','one-time'], true)) {
     $where[] = 'p.price_duration = :billing';
     $params[':billing'] = $billing;
+}
+if ($stock !== '' && in_array($stock, ['in','out','unknown'], true)) {
+    $where[] = 'p.stock_status = :stock';
+    $params[':stock'] = $stock;
 }
 if ($minPrice > 0) {
     $where[] = 'p.price >= :min_price';

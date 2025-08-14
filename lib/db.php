@@ -112,8 +112,44 @@ function db_init_schema(): void {
         if (!isset($existing['cpu_cores'])) { $alters[] = 'ADD COLUMN cpu_cores DECIMAL(5,2) NULL'; }
         if (!isset($existing['ram_mb'])) { $alters[] = 'ADD COLUMN ram_mb INT NULL'; }
         if (!isset($existing['storage_gb'])) { $alters[] = 'ADD COLUMN storage_gb INT NULL'; }
+        // Inventory stock columns
+        if (!isset($existing['stock_status'])) { $alters[] = "ADD COLUMN stock_status ENUM('in','out','unknown') NULL DEFAULT NULL"; }
+        if (!isset($existing['stock_checked_at'])) { $alters[] = 'ADD COLUMN stock_checked_at TIMESTAMP NULL DEFAULT NULL'; }
         if ($alters) {
             $pdo->exec('ALTER TABLE plans ' . implode(', ', $alters));
+        }
+        // Create helpful indexes if missing
+        try {
+            $checkIdx = function(string $indexName) use ($pdo, $dbName): bool {
+                $stmt = $pdo->prepare("SELECT COUNT(1) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = :db AND TABLE_NAME = 'plans' AND INDEX_NAME = :idx");
+                $stmt->execute([':db' => $dbName, ':idx' => $indexName]);
+                return ((int)$stmt->fetchColumn() > 0);
+            };
+            // order_url prefix (for stock sync)
+            if (!$checkIdx('idx_order_url')) {
+                $pdo->exec('CREATE INDEX idx_order_url ON plans (order_url(191))');
+            }
+            // common filters/sorts
+            if (!$checkIdx('idx_price')) {
+                $pdo->exec('CREATE INDEX idx_price ON plans (price)');
+            }
+            if (!$checkIdx('idx_price_duration')) {
+                $pdo->exec("CREATE INDEX idx_price_duration ON plans (price_duration)");
+            }
+            if (!$checkIdx('idx_stock_status')) {
+                $pdo->exec('CREATE INDEX idx_stock_status ON plans (stock_status)');
+            }
+            if (!$checkIdx('idx_location')) {
+                $pdo->exec('CREATE INDEX idx_location ON plans (location(64))');
+            }
+            if (!$checkIdx('idx_updated_at')) {
+                $pdo->exec('CREATE INDEX idx_updated_at ON plans (updated_at)');
+            }
+            if (!$checkIdx('idx_sort_order_id')) {
+                $pdo->exec('CREATE INDEX idx_sort_order_id ON plans (sort_order, id)');
+            }
+        } catch (Throwable $e2) {
+            @error_log('[DB] index create check failed: ' . $e2->getMessage());
         }
     } catch (Throwable $e) {
         @error_log('[DB] schema migrate check failed: ' . $e->getMessage());
@@ -124,6 +160,19 @@ function db_init_schema(): void {
         k VARCHAR(191) NOT NULL PRIMARY KEY,
         v TEXT NULL,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+
+    // Stock sync logs table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS stock_logs (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        run_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        code INT NOT NULL DEFAULT 0,
+        updated INT NOT NULL DEFAULT 0,
+        unknown INT NOT NULL DEFAULT 0,
+        skipped INT NOT NULL DEFAULT 0,
+        duration_ms INT NULL,
+        message VARCHAR(500) NULL,
+        KEY idx_run_at (run_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 }
 

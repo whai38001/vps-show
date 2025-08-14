@@ -101,6 +101,14 @@ a:hover { text-decoration: underline; }
 .btn:active { transform: translateY(1px); }
 .btn.disabled { opacity: .5; pointer-events: none; }
 
+/* Pagination minor tweaks */
+nav .btn.disabled { pointer-events: none; opacity: .5; }
+nav .muted.small { font-size: 12px; color: #9ca3af; }
+form select.input { max-width: 140px; }
+
+/* Keyword highlight */
+mark { background-color: rgba(245, 158, 11, .22); color: inherit; padding: 0 2px; border-radius: 3px; }
+
 /* Button variants */
 .btn-secondary { background: linear-gradient(90deg, #1f2937, #334155); color: #e5e7eb; }
 .btn-danger { background: linear-gradient(90deg, #ef4444, #f97316); color: #1b0b0b; }
@@ -123,6 +131,10 @@ a:hover { text-decoration: underline; }
 .specs { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 6px; }
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; background: #151a27; border: 1px solid #283043; color: #d1d5db; font-size: 12px; }
 .chip .emoji { filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); }
+/* Stock chips variants */
+.chip-in { background:#152117; border-color:#2b614f; color:#a7f3d0; }
+.chip-out { background:#231b1b; border-color:#5b2727; color:#fca5a5; }
+.chip-unknown { background:#1f2430; border-color:#3a4456; color:#cbd5e1; }
 
 /* Admin */
 .table { width: 100%; border-collapse: collapse; }
@@ -134,6 +146,7 @@ a:hover { text-decoration: underline; }
 .input, select, textarea { background: #121622; color: #e5e7eb; border: 1px solid #1e2536; border-radius: 8px; padding: 10px 12px; width: 100%; }
 label { font-size: 12px; color: #9ca3af; display: block; margin-bottom: 6px; }
 .admin-actions { display: flex; gap: 8px; }
+.logo-small { width: 32px; height: 32px; object-fit: contain; border-radius: 4px; background: #0b0d13; border: 1px solid #1d2230; }
 
 /* Toc */
 .prose .toc { background: rgba(148,163,184,.06); border: 1px solid #283043; border-radius: 10px; padding: 10px 12px; margin: 8px 0 14px; }
@@ -150,6 +163,67 @@ label { font-size: 12px; color: #9ca3af; display: block; margin-bottom: 6px; }
 
 /* Utilities */
 .small { font-size: 12px; }
+.btn-small { padding: 6px 8px; min-height: 30px; font-size: 12px; }
+/* Layout helpers to replace inline styles */
+.row { display: flex; }
+.wrap { flex-wrap: wrap; }
+.items-center { align-items: center; }
+.self-center { align-self: center; }
+.gap8 { gap: 8px; }
+.gap12 { gap: 12px; }
+.gap6 { gap: 6px; }
+.items-end { align-items: flex-end; }
+.mb8 { margin-bottom: 8px; }
+.mb12 { margin-bottom: 12px; }
+.mb16 { margin-bottom: 16px; }
+.mb24 { margin-bottom: 24px; }
+.mb6 { margin-bottom: 6px; }
+.mt8 { margin-top: 8px; }
+.mt10 { margin-top: 10px; }
+.mt6 { margin-top: 6px; }
+.mt12 { margin-top: 12px; }
+.mt24 { margin-top: 24px; }
+.w120 { width: 120px; }
+.w140 { width: 140px; }
+.w160 { width: 160px; }
+.w220 { width: 220px; }
+.w90 { width: 90px; }
+.w84 { width: 84px; }
+.nowrap { white-space: nowrap; }
+.justify-center { justify-content: center; }
+.justify-end { justify-content: flex-end; }
+.ml8 { margin-left: 8px; }
+.mx-auto { margin: 0 auto; }
+.maxw420 { max-width: 420px; }
+.maxw520 { max-width: 520px; }
+.maxw640 { max-width: 640px; }
+.maxw720 { max-width: 720px; }
+.maxw740 { max-width: 740px; }
+.minw420 { min-width: 420px; }
+.flex1 { flex: 1 1 auto; }
+.grid-260 { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.p18 { padding: 18px; }
+.text-light { color: #cbd5e1; }
+.opacity-60 { opacity: .6; }
+.opacity-80 { opacity: .8; }
+.text-lg { font-size: 18px; }
+.fw700 { font-weight: 700; }
+.hidden { display: none; }
+
+/* Pagination containers */
+.pager { display:flex; gap:8px; align-items:center; margin:18px 0 8px; flex-wrap:wrap; }
+.pager-form { display:flex; gap:8px; align-items:center; margin:8px 0 12px; }
+.ellipsis { align-self: center; }
+
+/* Alerts */
+.alert { padding:10px 12px; border-radius:8px; margin-bottom:12px; }
+.alert-error { background:#231b1b; border:1px solid #5b2727; color:#fca5a5; }
+.alert-success { background:#152117; border:1px solid #2b614f; color:#a7f3d0; }
+
+/* Tiny logo */
+.logo-xs { width:20px; height:20px; border-radius:4px; }
+.pre-log { white-space: pre-wrap; background:#0f172a; color:#cbd5e1; padding:8px; border-radius:6px; max-height:240px; overflow:auto; }
+.btn-small { padding: 6px 8px; min-height: 30px; font-size: 12px; }
 
 /* Responsive */
 @media (max-width: 640px) {

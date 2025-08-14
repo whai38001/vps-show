@@ -1,5 +1,29 @@
-# Log files
-log/
+# Project ignores
+# Secrets / local config
+lib/config.php
 
-# Temporary files
+# Logs and temp
+log/
 tmp/
+*.log
+
+# Archives / artifacts
+*.zip
+main.zip
+vps-show-main/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+
+# Package managers (future-proof)
+node_modules/
+vendor/
+composer.lock
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Env files
+.env
+.env.*

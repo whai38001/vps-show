@@ -14,6 +14,7 @@ This project is a simple website to display and manage VPS (Virtual Private Serv
     *   CRUD (Create, Read, Update, Delete) functionality for vendors.
     *   CRUD functionality for VPS plans.
     *   Scripts to seed the database with initial data and import from specific vendors.
+    *   Stock status management: configure an external API and one-click sync "In stock/Out of stock" to each plan.
 
 **特性（中文）**
 
@@ -73,6 +74,11 @@ For detailed deployment instructions, please see [DEPLOYMENT.md](./DEPLOYMENT.md
 1. 数据库配置：编辑 `lib/config.php`，填写 `DB_HOSTS`、`DB_PORT`、`DB_NAME`、`DB_USER`、`DB_PASS` 等参数。
 2. 管理员账号：建议在 `lib/config.php` 中设置安全的密码哈希（`ADMIN_PASSWORD_HASH`），并留空 `ADMIN_PASSWORD`。
 3. 初始化：首次访问会自动建表。访问 `/scripts/seed.php` 可导入示例数据。
+
+4. 库存状态（可选）：
+   - 后台进入 `库存同步`，填写接口地址、方法、Authorization 头、查询参数与字段映射（默认适配 `{data:{items:[{url,status}]}}`）。
+   - 点击“同步库存”即可更新所有匹配套餐的 `stock_status`（有货/无货/未知）。
+   - 也可使用 CLI 定时任务：`php scripts/stock_cron.php`（见下文）。
 
 4. 本地开发常用脚本：
    - PHP 语法检查：
@@ -145,6 +151,52 @@ This project includes several scripts in the `/scripts` directory for maintenanc
 -   **`db_diag.php`**: A diagnostic tool to check the database connection.
     -   **Usage**: Access `/scripts/db_diag.php` in your browser to see the connection status for hosts defined in your config.
 
+### Stock sync / 定时库存同步
+
+-   **`scripts/stock_cron.php`**: Run stock sync from CLI (crontab/systemd timer)
+    -   **Usage**:
+        ```bash
+        # Run once
+        php scripts/stock_cron.php
+
+        # Cron example: every 15 minutes
+        */15 * * * * /usr/bin/php /var/www/vps-site/scripts/stock_cron.php >> /var/log/vps-site/stock_cron.log 2>&1
+        ```
+    -   Reads settings from DB (configured in Admin -> 库存同步).
+    -   Updates `plans.stock_status`, `plans.stock_checked_at`.
+
+#### 自动同步（重要说明）
+
+- 后台“服务器定时任务示例”用于生成命令示例；真正生效的是你写入系统的 crontab 或 systemd。
+- 两种执行环境：
+  - Docker 模式（推荐）：在宿主机执行 `docker exec <容器名> php <容器内站点>/scripts/stock_cron.php`。
+  - Host 模式：直接使用宿主机 PHP 执行 `<宿主机站点>/scripts/stock_cron.php`。
+- 示例（Docker）：
+  ```bash
+  */15 * * * * /usr/bin/docker exec PHP846 php /www/sites/vs.140581.xyz/index/scripts/stock_cron.php >> /opt/1panel/www/sites/vs.140581.xyz/index/log/stock_cron.log 2>&1
+  ```
+  说明：脚本路径是容器内路径（/www/...），日志重定向到宿主机路径（/opt/.../log）。
+
+#### 日志轮转 / Log rotation
+
+- 建议为 `stock_cron.log` 与 `php-error.log` 配置 logrotate，限制总占用不超过 100MB。
+- 参考部署文档 DEPLOYMENT.md 中的示例配置。
+
+#### Webhook（可选）
+
+- 在后台“库存同步”页配置：
+  - 启用 Webhook
+  - Webhook URL
+  - Authorization 头（可多行，按需自定义，例如 `Authorization: Bearer <token>`）
+- 仅在库存状态发生变化（in/out/unknown 变更）时推送，负载示例：
+  ```json
+  {
+    "events": [
+      {"plan_id": 123, "title": "2GB KVM", "order_url": "https://...", "prev": "out", "curr": "in", "checked_at": "2025-08-13 17:30:00"}
+    ]
+  }
+  ```
+
 ## File Structure
 
 ```
@@ -204,6 +256,62 @@ For container/compose deployments, point `DB_HOSTS` to the database service name
 - Caching and rate-limiting:
   - `GET /api/plans.php` returns `ETag` and `Last-Modified`; supports conditional requests (HTTP 304).
   - Simple IP-based rate limit is enabled (default 120 req/min for read APIs).
+
+## 性能与索引（Performance & Indexes）
+
+- 应用启动时自动检查并在缺失时创建以下索引（表 `plans`）：
+  - `idx_order_url(order_url(191))`（库存同步按链接更新）
+  - `idx_price(price)`、`idx_price_duration(price_duration)`
+  - `idx_stock_status(stock_status)`（库存筛选）
+  - `idx_location(location(64))`（地区筛选，前缀索引）
+  - `idx_updated_at(updated_at)`（最近更新）
+  - `idx_sort_order_id(sort_order, id)`（后台默认排序）
+
+## 安全与部署要点（Security & Deployment）
+
+- 已启用安全响应头（CSP/Referrer-Policy/XFO/COOP/CORP/HSTS 等）。
+- 生产环境建议：
+  - 使用 `ADMIN_PASSWORD_HASH`，清空 `ADMIN_PASSWORD`。
+  - 将 `CORS_ALLOW_ORIGIN` 设置为你的站点域名。
+  - 禁止公网访问 `log/`、`tmp/`、`scripts/` 等目录（参见 DEPLOYMENT.md）。
+
+### 前端样式与 CSP（重要）
+
+- 站点已全面移除内联样式，CSP 已收紧为：
+  - `default-src 'self'; img-src * data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'self'`
+- 要求与实践：
+  - 不允许在 HTML 中使用 `style="..."` 或内联 `<style>...</style>`；新增样式请统一写入 `assets/style.css`。
+  - 不使用内联事件处理（如 `onclick`），请在 JS 中通过 `addEventListener` 绑定。
+  - 通过切换类名控制显隐与状态，例如：添加/移除 `.hidden`、`.disabled` 等。
+
+#### 常用 CSS 工具类（节选）
+
+- 布局对齐：`row`（flex 行）、`wrap`、`items-center`、`items-end`、`self-center`、`justify-center`、`justify-end`
+- 间距：`gap6`、`gap8`、`gap12`、`mt6`、`mt8`、`mt10`、`mt12`、`mb6`、`mb8`、`mb12`、`mb16`、`mb24`、`ml8`、`p18`
+- 宽度：`w84`、`w90`、`w120`、`w140`、`w160`、`w220`、`minw420`、`maxw420`、`maxw520`、`maxw640`、`maxw720`、`maxw740`、`flex1`
+- 文本：`small`、`text-light`（#cbd5e1）、`text-lg`（18px）、`fw700`、`muted`（.7 不透明度）
+- 其它：`hidden`（display:none）、`pre-log`（日志块通用样式，含背景/圆角/滚动）
+
+示例：将内联样式迁移为工具类
+
+```html
+<!-- 原： -->
+<div style="padding:18px; max-width:740px; margin:0 auto;">...</div>
+<!-- 现： -->
+<div class="p18 maxw740 mx-auto">...</div>
+
+<!-- 原： -->
+<span class="small" style="color:#9ca3af; margin-left:8px;">每页</span>
+<!-- 现： -->
+<span class="small ml8">每页</span>
+```
+
+新增样式说明：如需新工具类，请在 `assets/style.css` 的“Utilities”区域补充，命名力求简短一致（如 `.mt{n}`、`.w{n}`、语义类用 `text-*`/`items-*`）。
+
+## 故障排查（Troubleshooting）
+
+- “立即执行一次”按钮不可用：服务器禁用了 `proc_open` 或容器内无 docker 客户端。请使用 crontab/systemd，或后台“同步库存”按钮手动执行。
+- Cron 不生效：检查 `crontab -l`、`systemctl status cron`、日志路径是否存在、容器名与脚本路径是否正确（容器内为 /www/...）。
 
 ## Dev & QA
 
