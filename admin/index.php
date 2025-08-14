@@ -94,6 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $subtitle = trim($_POST['subtitle'] ?? '');
         $price = (float)($_POST['price'] ?? 0);
         $price_duration = $_POST['price_duration'] ?? 'per year';
+        $details_url = trim($_POST['details_url'] ?? '');
         $order_url = trim($_POST['order_url'] ?? '');
         $location = trim($_POST['location'] ?? '');
         $features_raw = trim($_POST['features'] ?? '');
@@ -140,11 +141,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($vendor_id > 0 && $title !== '' && $price > 0) {
             if ($id > 0) {
-                $stmt = $pdo->prepare('UPDATE plans SET vendor_id=:vendor_id,title=:title,subtitle=:subtitle,price=:price,price_duration=:d,order_url=:url,location=:loc,features=:f,cpu=:cpu,ram=:ram,storage=:storage,cpu_cores=:cpu_cores,ram_mb=:ram_mb,storage_gb=:storage_gb,highlights=:h,sort_order=:s WHERE id=:id');
-                $stmt->execute([':vendor_id'=>$vendor_id, ':title'=>$title, ':subtitle'=>$subtitle, ':price'=>$price, ':d'=>$price_duration, ':url'=>$order_url, ':loc'=>$location, ':f'=>json_encode($features, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ':cpu'=>$cpu, ':ram'=>$ram, ':storage'=>$storage, ':cpu_cores'=>$cpu_cores, ':ram_mb'=>$ram_mb, ':storage_gb'=>$storage_gb, ':h'=>$highlights, ':s'=>$sort_order, ':id'=>$id]);
+                $stmt = $pdo->prepare('UPDATE plans SET vendor_id=:vendor_id,title=:title,subtitle=:subtitle,price=:price,price_duration=:d,details_url=:du,order_url=:url,location=:loc,features=:f,cpu=:cpu,ram=:ram,storage=:storage,cpu_cores=:cpu_cores,ram_mb=:ram_mb,storage_gb=:storage_gb,highlights=:h,sort_order=:s WHERE id=:id');
+                $stmt->execute([':vendor_id'=>$vendor_id, ':title'=>$title, ':subtitle'=>$subtitle, ':price'=>$price, ':d'=>$price_duration, ':du'=>$details_url, ':url'=>$order_url, ':loc'=>$location, ':f'=>json_encode($features, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ':cpu'=>$cpu, ':ram'=>$ram, ':storage'=>$storage, ':cpu_cores'=>$cpu_cores, ':ram_mb'=>$ram_mb, ':storage_gb'=>$storage_gb, ':h'=>$highlights, ':s'=>$sort_order, ':id'=>$id]);
             } else {
-                $stmt = $pdo->prepare('INSERT INTO plans (vendor_id,title,subtitle,price,price_duration,order_url,location,features,cpu,ram,storage,cpu_cores,ram_mb,storage_gb,highlights,sort_order) VALUES (:vendor_id,:title,:subtitle,:price,:d,:url,:loc,:f,:cpu,:ram,:storage,:cpu_cores,:ram_mb,:storage_gb,:h,:s)');
-                $stmt->execute([':vendor_id'=>$vendor_id, ':title'=>$title, ':subtitle'=>$subtitle, ':price'=>$price, ':d'=>$price_duration, ':url'=>$order_url, ':loc'=>$location, ':f'=>json_encode($features, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ':cpu'=>$cpu, ':ram'=>$ram, ':storage'=>$storage, ':cpu_cores'=>$cpu_cores, ':ram_mb'=>$ram_mb, ':storage_gb'=>$storage_gb, ':h'=>$highlights, ':s'=>$sort_order]);
+                $stmt = $pdo->prepare('INSERT INTO plans (vendor_id,title,subtitle,price,price_duration,details_url,order_url,location,features,cpu,ram,storage,cpu_cores,ram_mb,storage_gb,highlights,sort_order) VALUES (:vendor_id,:title,:subtitle,:price,:d,:du,:url,:loc,:f,:cpu,:ram,:storage,:cpu_cores,:ram_mb,:storage_gb,:h,:s)');
+                $stmt->execute([':vendor_id'=>$vendor_id, ':title'=>$title, ':subtitle'=>$subtitle, ':price'=>$price, ':d'=>$price_duration, ':du'=>$details_url, ':url'=>$order_url, ':loc'=>$location, ':f'=>json_encode($features, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ':cpu'=>$cpu, ':ram'=>$ram, ':storage'=>$storage, ':cpu_cores'=>$cpu_cores, ':ram_mb'=>$ram_mb, ':storage_gb'=>$storage_gb, ':h'=>$highlights, ':s'=>$sort_order]);
             }
         }
         flash_set('success', '套餐已保存');
@@ -1060,7 +1061,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
     <?php endif; ?>
     <div class="header">
       <div class="brand">
-        <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4dd.png" alt="admin">
+        <img src="../assets/emoji/memo.svg" alt="admin" width="36" height="36">
         <h1>管理后台</h1>
       </div>
       <div class="row items-center gap8">
@@ -1113,25 +1114,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
 
       <section>
         <h2 class="mt6 mb12">厂商列表</h2>
-        <form method="get" class="row wrap items-center gap8 mb8">
-          <input type="hidden" name="tab" value="vendors">
-          <input type="hidden" name="vendors_page" value="1">
-          <input type="hidden" name="vendors_sort" value="<?= htmlspecialchars($vendorsSort) ?>">
-          <input class="input w220" type="text" name="vendor_q" placeholder="搜索厂商/官网" value="<?= htmlspecialchars($vendorQ) ?>">
-          <button class="btn" type="submit">搜索</button>
-          <a class="btn btn-secondary" href="?tab=vendors">重置</a>
-          <noscript><button class="btn" type="submit">应用</button></noscript>
-        </form>
         <?php $vendDl = array_intersect_key($_GET, array_flip(['tab','vendor_q','vendors_sort'])); $vendDl['download']='vendors_csv_current'; ?>
-        <div class="row items-center gap8 mb8 mt8"><a class="btn" href="?<?= htmlspecialchars(http_build_query($vendDl)) ?>">导出当前筛选 CSV</a></div>
-        <form method="post" onsubmit="return confirm('确认对所选厂商执行该操作？');">
-          <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
-          <input type="hidden" name="action" value="vendors_bulk_delete">
-        <div class="row items-center gap8 mb8 mt6">
+        <div class="row wrap items-center gap8 mb8">
+          <form method="get" class="row wrap items-center gap8">
+            <input type="hidden" name="tab" value="vendors">
+            <input type="hidden" name="vendors_page" value="1">
+            <input type="hidden" name="vendors_sort" value="<?= htmlspecialchars($vendorsSort) ?>">
+            <input class="input w220" type="text" name="vendor_q" placeholder="搜索厂商/官网" value="<?= htmlspecialchars($vendorQ) ?>">
+            <button class="btn" type="submit">搜索</button>
+            <a class="btn btn-secondary" href="?tab=vendors">重置</a>
+            <noscript><button class="btn" type="submit">应用</button></noscript>
+          </form>
+          <a class="btn" href="?<?= htmlspecialchars(http_build_query($vendDl)) ?>">导出当前筛选 CSV</a>
+          <form method="post" onsubmit="return confirm('确认对所选厂商执行该操作？');" class="row items-center gap8">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
+            <input type="hidden" name="action" value="vendors_bulk_delete">
             <button class="btn btn-danger" type="submit">批量删除</button>
             <span class="small muted">勾选需要删除的厂商</span>
-          </div>
-          <table class="table">
+          </form>
+        </div>
+        <table class="table">
             <thead>
               <tr>
                 <th><input type="checkbox" class="js-select-all" aria-label="选择全部"></th>
@@ -1236,6 +1238,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
             <div>
               <label>下单链接</label>
               <input class="input" type="url" name="order_url" value="<?= $editingPlan ? htmlspecialchars((string)$editingPlan['order_url']) : '' ?>">
+            </div>
+            <div>
+              <label>详情链接</label>
+              <input class="input" type="url" name="details_url" placeholder="https://...（可选）" value="<?= $editingPlan ? htmlspecialchars((string)($editingPlan['details_url'] ?? '')) : '' ?>">
             </div>
             <div>
               <label>部署地区/机房</label>
@@ -1372,6 +1378,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
                 <th>库存</th>
                 <th><a href="<?= htmlspecialchars($makeSort('sort_asc')) ?>">排序</a></th>
                 <th>角标</th>
+                <th>详情</th>
                 <th>操作</th>
               </tr>
             </thead>
@@ -1399,6 +1406,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
                 </td>
                 <td><?= (int)$p['sort_order'] ?></td>
                 <td><?= htmlspecialchars((string)$p['highlights']) ?></td>
+                <td><?php $du=(string)($p['details_url']??''); if($du){ echo '<a href="'.htmlspecialchars($du).'" target="_blank" rel="nofollow noopener">查看</a>'; } ?></td>
                 <td class="admin-actions">
                   <a class="btn" href="?tab=plans&edit_plan=<?= (int)$p['id'] ?>">编辑</a>
                   <form method="post" data-confirm="复制该套餐为新记录？">

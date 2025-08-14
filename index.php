@@ -134,12 +134,13 @@ $plans = $stmt->fetchAll();
       <div class="nav-right">
         <a class="btn" href="?<?= htmlspecialchars(http_build_query(array_merge($_GET, ['lang'=>'zh']))) ?>"><?= htmlspecialchars(t('lang_zh')) ?></a>
         <a class="btn" href="?<?= htmlspecialchars(http_build_query(array_merge($_GET, ['lang'=>'en']))) ?>">EN</a>
+        <button class="btn btn-secondary btn-small" id="theme-toggle" type="button" aria-label="Toggle theme">切换主题</button>
         <a class="btn btn-secondary" href="admin/"><?= htmlspecialchars(t('admin_panel')) ?></a>
       </div>
     </nav>
     <header class="header">
       <div class="brand">
-        <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f680.png" alt="logo">
+        <img src="assets/emoji/rocket.svg" alt="logo" width="36" height="36">
         <h1><?= htmlspecialchars(t('site_title')) ?></h1>
       </div>
       <form class="search row items-center gap8" method="get">
@@ -218,30 +219,45 @@ $plans = $stmt->fetchAll();
             <div class="ribbon"><?= htmlspecialchars(i18n_text((string)$plan['highlights'])) ?></div>
           <?php endif; ?>
           <div class="card-header">
-            <img src="<?= htmlspecialchars($plan['logo_url'] ?: 'https://via.placeholder.com/72x72?text=VPS') ?>" alt="<?= htmlspecialchars($plan['vendor_name']) ?>" loading="lazy" width="36" height="36">
+            <?php $vsite = (string)($plan['website'] ?? ''); ?>
+            <?php if ($vsite !== ''): ?>
+              <a href="<?= htmlspecialchars($vsite) ?>" target="_blank" rel="noopener nofollow">
+                <img src="<?= htmlspecialchars($plan['logo_url'] ?: 'https://via.placeholder.com/72x72?text=VPS') ?>" alt="<?= htmlspecialchars($plan['vendor_name']) ?>" loading="lazy" width="36" height="36">
+              </a>
+            <?php else: ?>
+              <img src="<?= htmlspecialchars($plan['logo_url'] ?: 'https://via.placeholder.com/72x72?text=VPS') ?>" alt="<?= htmlspecialchars($plan['vendor_name']) ?>" loading="lazy" width="36" height="36">
+            <?php endif; ?>
             <div class="title">
               <div class="size"><?= htmlspecialchars(i18n_text((string)$plan['title'])) ?></div>
               <div class="sub"><?= htmlspecialchars(i18n_text((string)($plan['subtitle'] ?: 'VPS'))) ?> · <?= htmlspecialchars($plan['vendor_name']) ?></div>
             </div>
           </div>
           <div class="card-body">
-            <?php if (isset($plan['stock_status']) && $plan['stock_status']): ?>
-              <div class="meta" title="<?= htmlspecialchars(t('stock_status')) ?>">
-                <?php if ($plan['stock_status'] === 'in'): ?>
-                  <span class="chip chip-in"><?= htmlspecialchars(t('in_stock')) ?></span>
-                <?php elseif ($plan['stock_status'] === 'out'): ?>
-                  <span class="chip chip-out"><?= htmlspecialchars(t('out_of_stock')) ?></span>
-                <?php else: ?>
-                  <span class="chip chip-unknown"><?= htmlspecialchars(t('unknown')) ?></span>
-                <?php endif; ?>
-              </div>
-            <?php endif; ?>
             <?php if (!empty($plan['location'])): ?>
               <div class="meta">📍 <?= htmlspecialchars(i18n_text((string)$plan['location'])) ?></div>
             <?php endif; ?>
-            <div class="price">
-              <span class="amount">$<?= number_format((float)$plan['price'], 2) ?></span>
-              <span class="duration"><?= htmlspecialchars(i18n_duration_label($plan['price_duration'])) ?></span>
+            <?php $details = (string)($plan['details_url'] ?? ''); $hasStock = isset($plan['stock_status']) && $plan['stock_status']; ?>
+            <div class="price-row">
+              <div class="row items-center gap8">
+                <div class="price">
+                  <span class="amount">$<?= number_format((float)$plan['price'], 2) ?></span>
+                  <span class="duration"><?= htmlspecialchars(i18n_duration_label($plan['price_duration'])) ?></span>
+                </div>
+                <?php if ($hasStock): ?>
+                  <div class="meta" title="<?= htmlspecialchars(t('stock_status')) ?>">
+                    <?php if ($plan['stock_status'] === 'in'): ?>
+                      <span class="chip chip-in"><?= htmlspecialchars(t('in_stock')) ?></span>
+                    <?php elseif ($plan['stock_status'] === 'out'): ?>
+                      <span class="chip chip-out"><?= htmlspecialchars(t('out_of_stock')) ?></span>
+                    <?php else: ?>
+                      <span class="chip chip-unknown"><?= htmlspecialchars(t('unknown')) ?></span>
+                    <?php endif; ?>
+                  </div>
+                <?php endif; ?>
+              </div>
+              <?php if ($details !== ''): ?>
+                <a class="details-btn" href="<?= htmlspecialchars($details) ?>" target="_blank" rel="nofollow noopener"><?= htmlspecialchars(t('details')) ?></a>
+              <?php endif; ?>
             </div>
             <?php
               $cpuCores = isset($plan['cpu_cores']) ? (float)$plan['cpu_cores'] : 0.0;
@@ -362,7 +378,7 @@ $plans = $stmt->fetchAll();
     </div>
     <?php
       // Recently added: last 6 by updated_at
-      $recent = $pdo->query('SELECT p.*, v.name AS vendor_name, v.logo_url FROM plans p INNER JOIN vendors v ON v.id=p.vendor_id ORDER BY p.updated_at DESC LIMIT 6')->fetchAll();
+      $recent = $pdo->query('SELECT p.*, v.name AS vendor_name, v.logo_url, v.website FROM plans p INNER JOIN vendors v ON v.id=p.vendor_id ORDER BY p.updated_at DESC LIMIT 6')->fetchAll();
       if ($recent): ?>
       <section class="mt24">
         <h2 class="mb12 text-lg"><?= htmlspecialchars(t('recently_added')) ?></h2>
@@ -371,7 +387,14 @@ $plans = $stmt->fetchAll();
             <article class="card">
               <?php if (!empty($r['highlights'])): ?><div class="ribbon"><?= htmlspecialchars(i18n_text((string)$r['highlights'])) ?></div><?php endif; ?>
               <div class="card-header">
-                <img src="<?= htmlspecialchars($r['logo_url'] ?: 'https://via.placeholder.com/72x72?text=VPS') ?>" alt="<?= htmlspecialchars($r['vendor_name']) ?>" loading="lazy" width="36" height="36">
+                <?php $rvsite = (string)($r['website'] ?? ''); ?>
+                <?php if ($rvsite !== ''): ?>
+                  <a href="<?= htmlspecialchars($rvsite) ?>" target="_blank" rel="noopener nofollow">
+                    <img src="<?= htmlspecialchars($r['logo_url'] ?: 'https://via.placeholder.com/72x72?text=VPS') ?>" alt="<?= htmlspecialchars($r['vendor_name']) ?>" loading="lazy" width="36" height="36">
+                  </a>
+                <?php else: ?>
+                  <img src="<?= htmlspecialchars($r['logo_url'] ?: 'https://via.placeholder.com/72x72?text=VPS') ?>" alt="<?= htmlspecialchars($r['vendor_name']) ?>" loading="lazy" width="36" height="36">
+                <?php endif; ?>
                 <div class="title">
                   <div class="size"><?= htmlspecialchars(i18n_text((string)$r['title'])) ?></div>
                   <div class="sub"><?= htmlspecialchars(i18n_text((string)($r['subtitle'] ?: 'VPS'))) ?> · <?= htmlspecialchars($r['vendor_name']) ?></div>
