@@ -17,7 +17,11 @@
         form.append('action', 'stock_sync_now');
         form.append('ajax', '1');
       // extra options
-      if (chkDryRun && chkDryRun.checked) form.append('dry_run', '1');
+      if (chkDryRun) {
+        // Respect the current checkbox state explicitly (user choice at click time)
+        // Do not auto-reset to default; send as-is
+        if (chkDryRun.checked) form.append('dry_run', '1');
+      }
       if (inputLimit && inputLimit.value) form.append('limit', String(inputLimit.value));
       const resp = await fetch(location.href, { method: 'POST', body: form, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
         let data = null; try { data = await resp.json(); } catch(e) {}

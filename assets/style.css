@@ -109,7 +109,11 @@ a:hover { text-decoration: underline; }
 /* Pagination minor tweaks */
 nav .btn.disabled { pointer-events: none; opacity: .5; }
 nav .muted.small { font-size: 12px; color: #9ca3af; }
-form select.input { max-width: 140px; }
+form select.input { max-width: 140px; height: 40px; }
+.btn { min-height: 40px; padding: 0 12px; }
+.logs-actions .btn { height: 40px; line-height: 40px; padding: 0 12px; }
+.logs-actions a.btn { display: inline-flex; align-items: center; height: 40px; }
+.logs-actions { align-self: flex-end; }
 
 /* Keyword highlight */
 mark { background-color: rgba(245, 158, 11, .22); color: inherit; padding: 0 2px; border-radius: 3px; }

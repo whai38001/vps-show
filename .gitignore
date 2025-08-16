@@ -1,29 +1,39 @@
-# Project ignores
-# Secrets / local config
+# Core secrets
 lib/config.php
+.env
+.env.*
 
-# Logs and temp
+# Runtime & logs
 log/
 tmp/
 *.log
 
-# Archives / artifacts
+# Archives & dumps
 *.zip
-main.zip
-vps-show-main/
+*.tar
+*.tar.gz
+*.tgz
+*.gz
+*.7z
+*.bak
+*.sql
+*.sqlite
+*.db
 
-# OS / editor junk
-.DS_Store
-Thumbs.db
-
-# Package managers (future-proof)
+# Node / Composer (just in case)
 node_modules/
 vendor/
 composer.lock
 package-lock.json
-pnpm-lock.yaml
 yarn.lock
+pnpm-lock.yaml
 
-# Env files
-.env
-.env.*
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Project-specific
+main.zip
+vps-show-main/

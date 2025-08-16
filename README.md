@@ -69,6 +69,16 @@ For detailed deployment instructions, please see [DEPLOYMENT.md](./DEPLOYMENT.md
     *   MySQL/MariaDB 10.x+
     *   Nginx/OpenResty + PHP-FPM
 
+### Configuration (important)
+
+- Copy the example config and edit values:
+  ```bash
+  cp lib/config.example.php lib/config.php
+  # then edit lib/config.php (DB_HOSTS/DB_NAME/DB_USER/DB_PASS, SITE_NAME, etc.)
+  ```
+- `lib/config.php` is intentionally git-ignored to avoid leaking secrets.
+- The app falls back to `lib/config.example.php` if `lib/config.php` is missing, but you should create your own config for a real deployment.
+
 **安装与初始化（中文）**
 
 1. 数据库配置：编辑 `lib/config.php`，填写 `DB_HOSTS`、`DB_PORT`、`DB_NAME`、`DB_USER`、`DB_PASS` 等参数。

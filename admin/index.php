@@ -372,14 +372,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($dockerBinPost !== '') { db_set_setting('stock_docker_bin', $dockerBinPost); }
             }
         }
-        // Defaults for manual sync extras
-        if (array_key_exists('dry_run_default', $_POST)) {
-            $dryRunDefault = isset($_POST['dry_run_default']) && $_POST['dry_run_default'] === '1' ? 1 : 0;
+        // Defaults for manual/cron sync extras (treat missing dry_run_default as 0 when this subform is submitted)
+        $isAutoDefaultsForm = array_key_exists('dry_run_default', $_POST) || array_key_exists('limit_default', $_POST) || array_key_exists('auto_enabled', $_POST) || array_key_exists('auto_interval_min', $_POST);
+        if ($isAutoDefaultsForm) {
+            $dryRunDefault = (isset($_POST['dry_run_default']) && $_POST['dry_run_default'] === '1') ? 1 : 0;
             db_set_setting('stock_dry_run_default', (string)$dryRunDefault);
-        }
-        if (array_key_exists('limit_default', $_POST)) {
-            $limitDefault = isset($_POST['limit_default']) ? max(0, (int)$_POST['limit_default']) : 0;
-            db_set_setting('stock_limit_default', (string)$limitDefault);
+            if (array_key_exists('limit_default', $_POST)) {
+                $limitDefault = isset($_POST['limit_default']) ? max(0, (int)$_POST['limit_default']) : 0;
+                db_set_setting('stock_limit_default', (string)$limitDefault);
+            }
         }
         flash_set('success', '库存接口配置已保存');
         redirect_same();
@@ -496,32 +497,225 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $outVal = (string)($map['out'] ?? 'Out of Stock');
 
         $updated = 0; $unknown = 0; $skipped = 0;
+        $requireVendorHostForFallback = (int)db_get_setting('stock_match_require_vendor', '1') ? true : false;
         $dryRun = isset($_POST['dry_run']) && $_POST['dry_run'] === '1';
         $limit = isset($_POST['limit']) ? max(0, (int)$_POST['limit']) : 0;
         $now = date('Y-m-d H:i:s');
         $processed = 0;
+        // Helpers for dot-path access and normalization
+        $arrayGetByPath = function(array $arr, string $path) {
+            if ($path === '') { return null; }
+            if (array_key_exists($path, $arr)) { return $arr[$path]; }
+            $segments = explode('.', $path);
+            $node = $arr;
+            foreach ($segments as $seg) {
+                if (!is_array($node) || !array_key_exists($seg, $node)) { return null; }
+                $node = $node[$seg];
+            }
+            return $node;
+        };
+        $normalizeStock = function($raw, string $inLabel, string $outLabel) {
+            if (is_string($raw)) {
+                $val = trim($raw);
+                if ($val !== '') {
+                    if (strcasecmp($val, $inLabel) === 0) { return 'in'; }
+                    if (strcasecmp($val, $outLabel) === 0) { return 'out'; }
+                }
+                $lc = strtolower($val);
+                $truthy = ['in','available','in stock','instock','yes','true','1','有货','在售','现货','up','online','running','active'];
+                $falsy  = ['out','unavailable','out of stock','sold out','no','false','0','无货','缺货','down','offline','stopped','inactive'];
+                if (in_array($lc, $truthy, true)) { return 'in'; }
+                if (in_array($lc, $falsy, true)) { return 'out'; }
+            } elseif (is_bool($raw)) {
+                return $raw ? 'in' : 'out';
+            } elseif (is_int($raw) || is_float($raw)) {
+                return ((float)$raw) > 0 ? 'in' : 'out';
+            }
+            return 'unknown';
+        };
+
+        $buildUrlCandidates = function(string $url) {
+            $candidates = [];
+            $url = trim($url);
+            if ($url === '') { return $candidates; }
+            $candidates[] = $url;
+            $parts = @parse_url($url);
+            if (is_array($parts)) {
+                $scheme = isset($parts['scheme']) ? strtolower($parts['scheme']) : 'http';
+                $host = isset($parts['host']) ? strtolower($parts['host']) : '';
+                $path = isset($parts['path']) ? $parts['path'] : '';
+                $query = isset($parts['query']) ? $parts['query'] : '';
+                parse_str($query, $params);
+                $filtered = [];
+                foreach ($params as $k => $v) {
+                    $kl = strtolower((string)$k);
+                    if ($kl === 'currency' || $kl === 'lang' || $kl === 'locale' || $kl === 'utm_source' || $kl === 'utm_medium' || $kl === 'utm_campaign' || $kl === 'ref' || $kl === 'refid' || $kl === 'aff' || $kl === 'affid') {
+                        continue;
+                    }
+                    $filtered[$k] = $v;
+                }
+                ksort($filtered);
+                $normQuery = http_build_query($filtered);
+                $base = $scheme . '://' . $host . $path;
+                $norm = $normQuery !== '' ? ($base . '?' . $normQuery) : $base;
+                if (!in_array($norm, $candidates, true)) { $candidates[] = $norm; }
+                if (!in_array($base, $candidates, true)) { $candidates[] = $base; }
+            }
+            return $candidates;
+        };
+
         foreach ($items as $it) {
             if ($limit > 0 && $processed >= $limit) { break; }
             if (!is_array($it)) { $skipped++; continue; }
-            $keyVal = isset($it[$matchOn]) ? (string)$it[$matchOn] : '';
+            $keyRaw = $arrayGetByPath(is_array($it)?$it:[], $matchOn);
+            $keyVal = is_scalar($keyRaw) ? (string)$keyRaw : '';
+            if ($keyVal === '' && $matchOn === 'url') {
+                foreach (['url','order_url','href','link'] as $alt) {
+                    if (isset($it[$alt]) && is_scalar($it[$alt]) && (string)$it[$alt] !== '') { $keyVal = (string)$it[$alt]; break; }
+                }
+            }
             if ($keyVal === '') { $skipped++; continue; }
-            $statusVal = isset($it[$statusField]) ? (string)$it[$statusField] : '';
-            $stock = null;
-            if ($statusVal !== '') {
-                if (strcasecmp($statusVal, $inVal) === 0) { $stock = 'in'; }
-                elseif (strcasecmp($statusVal, $outVal) === 0) { $stock = 'out'; }
-                else { $stock = 'unknown'; $unknown++; }
-            } else { $stock = 'unknown'; $unknown++; }
-            // Match plan by order_url or title (fallback)
+            $statusRaw = $arrayGetByPath(is_array($it)?$it:[], $statusField);
+            $stock = $normalizeStock($statusRaw, $inVal, $outVal);
+            if ($stock === 'unknown') { $unknown++; }
+            // Match plan by order_url (with normalization/heuristics); if not found and title/name present, fallback to title
             if ($matchOn === 'url') {
                 if ($dryRun) {
-                    $stmt = $pdo->prepare('SELECT COUNT(*) FROM plans WHERE order_url=:k');
-                    $stmt->execute([':k'=>$keyVal]);
-                    $updated += (int)$stmt->fetchColumn();
+                    $cands = $buildUrlCandidates($keyVal);
+                    $likeHostPath = null; $pid = null;
+                    $parts = @parse_url($keyVal);
+                    if (is_array($parts)) {
+                        $host = isset($parts['host']) ? strtolower($parts['host']) : '';
+                        $path = isset($parts['path']) ? $parts['path'] : '';
+                        if ($host || $path) { $likeHostPath = '%' . $host . $path . '%'; }
+                        if (isset($parts['query'])) { parse_str($parts['query'], $q); if (isset($q['pid'])) { $pid = (string)$q['pid']; } }
+                    }
+                    $conds = [];
+                    $paramsSel = [];
+                    $i = 0;
+                    foreach ($cands as $c) { $i++; $conds[] = 'p.order_url = :u' . $i; $paramsSel[':u'.$i] = $c; }
+                    $sqlSel = 'SELECT p.id, p.order_url, v.website AS vendor_website FROM plans p INNER JOIN vendors v ON v.id=p.vendor_id WHERE ' . implode(' OR ', $conds);
+                    $stmt = $pdo->prepare($sqlSel);
+                    $stmt->execute($paramsSel);
+                    $rows = $stmt->fetchAll();
+                    // If no exact match, try like queries with vendor host constraint when enabled
+                    if (!$rows) {
+                        $rows = [];
+                        if ($likeHostPath) {
+                            if ($pid !== null && $pid !== '') {
+                                $stmt2 = $pdo->prepare('SELECT p.id, p.order_url, v.website AS vendor_website FROM plans p INNER JOIN vendors v ON v.id=p.vendor_id WHERE p.order_url LIKE :likehp AND p.order_url LIKE :likepid');
+                                $stmt2->execute([':likehp'=>$likeHostPath, ':likepid'=>'%pid=' . $pid . '%']);
+                                $rows = $stmt2->fetchAll();
+                            }
+                            if (!$rows) {
+                                $stmt3 = $pdo->prepare('SELECT p.id, p.order_url, v.website AS vendor_website FROM plans p INNER JOIN vendors v ON v.id=p.vendor_id WHERE p.order_url LIKE :likehp');
+                                $stmt3->execute([':likehp'=>$likeHostPath]);
+                                $rows = $stmt3->fetchAll();
+                            }
+                        }
+                        if ($requireVendorHostForFallback && $rows) {
+                            $keyHost = parse_url($keyVal, PHP_URL_HOST) ?: '';
+                            $rows = array_values(array_filter($rows, function($r) use ($keyHost) {
+                                $vw = (string)($r['vendor_website'] ?? '');
+                                $vh = parse_url($vw, PHP_URL_HOST) ?: '';
+                                $norm = function($h){ return strtolower(preg_replace('/^www\./i', '', (string)$h)); };
+                                return $norm($keyHost) !== '' && $norm($keyHost) === $norm($vh);
+                            }));
+                        }
+                    }
+                    $cnt = $rows ? count($rows) : 0;
+                    if ($cnt === 0) {
+                        $titleKey = (string)($it['title'] ?? ($it['name'] ?? ''));
+                        if ($titleKey !== '') {
+                            $stmt2 = $pdo->prepare('SELECT p.id, v.website AS vendor_website FROM plans p INNER JOIN vendors v ON v.id=p.vendor_id WHERE p.title=:k');
+                            $stmt2->execute([':k'=>$titleKey]);
+                            $rows = $stmt2->fetchAll();
+                            if ($requireVendorHostForFallback && $rows) {
+                                $keyHost = parse_url($keyVal, PHP_URL_HOST) ?: '';
+                                $rows = array_values(array_filter($rows, function($r) use ($keyHost) {
+                                    $vw = (string)($r['vendor_website'] ?? '');
+                                    $vh = parse_url($vw, PHP_URL_HOST) ?: '';
+                                    $norm = function($h){ return strtolower(preg_replace('/^www\./i', '', (string)$h)); };
+                                    return $norm($keyHost) !== '' && $norm($keyHost) === $norm($vh);
+                                }));
+                            }
+                            $cnt = $rows ? count($rows) : 0;
+                        }
+                    }
+                    $updated += $cnt;
                 } else {
-                    $stmt = $pdo->prepare('UPDATE plans SET stock_status=:s, stock_checked_at=:t WHERE order_url=:k');
-                    $stmt->execute([':s'=>$stock, ':t'=>$now, ':k'=>$keyVal]);
-                    $updated += $stmt->rowCount();
+                    $cands = $buildUrlCandidates($keyVal);
+                    $likeHostPath = null; $pid = null;
+                    $parts = @parse_url($keyVal);
+                    if (is_array($parts)) {
+                        $host = isset($parts['host']) ? strtolower($parts['host']) : '';
+                        $path = isset($parts['path']) ? $parts['path'] : '';
+                        if ($host || $path) { $likeHostPath = '%' . $host . $path . '%'; }
+                        if (isset($parts['query'])) { parse_str($parts['query'], $q); if (isset($q['pid'])) { $pid = (string)$q['pid']; } }
+                    }
+                    $conds = [];
+                    $paramsSel = [];
+                    $i = 0;
+                    foreach ($cands as $c) { $i++; $conds[] = 'p.order_url = :u' . $i; $paramsSel[':u'.$i] = $c; }
+                    $sqlSel = 'SELECT p.id, p.title, p.order_url, p.stock_status, v.website AS vendor_website FROM plans p INNER JOIN vendors v ON v.id=p.vendor_id WHERE ' . implode(' OR ', $conds);
+                    $sel = $pdo->prepare($sqlSel);
+                    $sel->execute($paramsSel);
+                    $rows = $sel->fetchAll();
+                    if (!$rows) {
+                        if ($likeHostPath) {
+                            if ($pid !== null && $pid !== '') {
+                                $stmt2 = $pdo->prepare('SELECT p.id, p.title, p.order_url, p.stock_status, v.website AS vendor_website FROM plans p INNER JOIN vendors v ON v.id=p.vendor_id WHERE p.order_url LIKE :likehp AND p.order_url LIKE :likepid');
+                                $stmt2->execute([':likehp'=>$likeHostPath, ':likepid'=>'%pid=' . $pid . '%']);
+                                $rows = $stmt2->fetchAll();
+                            }
+                            if (!$rows) {
+                                $stmt3 = $pdo->prepare('SELECT p.id, p.title, p.order_url, p.stock_status, v.website AS vendor_website FROM plans p INNER JOIN vendors v ON v.id=p.vendor_id WHERE p.order_url LIKE :likehp');
+                                $stmt3->execute([':likehp'=>$likeHostPath]);
+                                $rows = $stmt3->fetchAll();
+                            }
+                        }
+                        if ($requireVendorHostForFallback && $rows) {
+                            $keyHost = parse_url($keyVal, PHP_URL_HOST) ?: '';
+                            $rows = array_values(array_filter($rows, function($r) use ($keyHost) {
+                                $vw = (string)($r['vendor_website'] ?? '');
+                                $vh = parse_url($vw, PHP_URL_HOST) ?: '';
+                                $norm = function($h){ return strtolower(preg_replace('/^www\./i', '', (string)$h)); };
+                                return $norm($keyHost) !== '' && $norm($keyHost) === $norm($vh);
+                            }));
+                        }
+                    }
+                    $aff = 0;
+                    foreach ($rows as $row) {
+                        $prev = (string)($row['stock_status'] ?? '');
+                        if ($prev !== $stock) {
+                            $upd = $pdo->prepare('UPDATE plans SET stock_status=:s, stock_checked_at=:t WHERE id=:id');
+                            $upd->execute([':s'=>$stock, ':t'=>$now, ':id'=>(int)$row['id']]);
+                            $aff += $upd->rowCount();
+                        }
+                    }
+                    if ($aff === 0) {
+                        $titleKey = (string)($it['title'] ?? ($it['name'] ?? ''));
+                        if ($titleKey !== '') {
+                            $stmt2 = $pdo->prepare('SELECT p.id, v.website AS vendor_website FROM plans p INNER JOIN vendors v ON v.id=p.vendor_id WHERE p.title=:k');
+                            $stmt2->execute([':k'=>$titleKey]);
+                            $rows = $stmt2->fetchAll();
+                            if ($requireVendorHostForFallback && $rows) {
+                                $keyHost = parse_url($keyVal, PHP_URL_HOST) ?: '';
+                                $rows = array_values(array_filter($rows, function($r) use ($keyHost) {
+                                    $vw = (string)($r['vendor_website'] ?? '');
+                                    $vh = parse_url($vw, PHP_URL_HOST) ?: '';
+                                    $norm = function($h){ return strtolower(preg_replace('/^www\./i', '', (string)$h)); };
+                                    return $norm($keyHost) !== '' && $norm($keyHost) === $norm($vh);
+                                }));
+                            }
+                            foreach ($rows as $row) {
+                                $upd = $pdo->prepare('UPDATE plans SET stock_status=:s, stock_checked_at=:t WHERE id=:id');
+                                $upd->execute([':s'=>$stock, ':t'=>$now, ':id'=>(int)$row['id']]);
+                                $aff += $upd->rowCount();
+                            }
+                        }
+                    }
+                    $updated += $aff;
                 }
             } elseif ($matchOn === 'name' || $matchOn === 'title') {
                 if ($dryRun) {
@@ -559,6 +753,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $processed++;
         }
+        // Persist last run snapshot (so UI's "最近一次执行" reflects manual sync too)
+        try {
+            db_set_setting('stock_last_run_at', $now);
+            db_set_setting('stock_last_result', json_encode([
+                'updated' => $updated,
+                'unknown' => $unknown,
+                'skipped' => $skipped,
+                'dry_run' => $dryRun,
+                'code' => 0,
+            ], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES));
+        } catch (Throwable $e) { @error_log('[stock] save last_run (manual) failed: '.$e->getMessage()); }
+
         if ($isAjax) {
             if (!headers_sent()) { header('Content-Type: application/json; charset=utf-8'); }
             echo json_encode(['code'=>0,'message'=>'OK','data'=>['updated'=>$updated,'unknown'=>$unknown,'skipped'=>$skipped,'dry_run'=>$dryRun]], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
@@ -1595,7 +1801,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
           <pre id="sync-log" class="pre-log hidden"></pre>
           <div class="row wrap items-center gap12 mt8">
             <label class="row items-center gap6">
-              <input type="checkbox" id="stock-dry-run" value="1" <?= (int)db_get_setting('stock_dry_run_default','0') ? 'checked' : '' ?>> 演练模式（不落库）
+              <?php $dryDefault = (int)db_get_setting('stock_dry_run_default','0'); ?>
+              <input type="checkbox" id="stock-dry-run" value="1" <?= $dryDefault ? 'checked' : '' ?> data-default="<?= $dryDefault ?>"> 演练模式（不落库）
             </label>
             <label class="row items-center gap6">
               <span class="small muted">限制条数</span>
@@ -1673,7 +1880,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
         <h3 class="mt6 mb8">最近一次执行</h3>
         <div class="small text-light">
           时间：<?= htmlspecialchars($lastRunAt ?: 'N/A') ?>；
-          结果：<?= $lastResult ? ('updated='.(int)($lastResult['updated']??0).', unknown='.(int)($lastResult['unknown']??0).', skipped='.(int)($lastResult['skipped']??0).', code='.(int)($lastResult['code']??0)) : 'N/A' ?>
+          结果：<?= $lastResult ? ('updated='.(int)($lastResult['updated']??0).', unknown='.(int)($lastResult['unknown']??0).', skipped='.(int)($lastResult['skipped']??0).', code='.(int)($lastResult['code']??0).', dry_run='.(int)(!empty($lastResult['dry_run'])?1:0)) : 'N/A' ?>
+        </div>
+        <div class="small muted mt6">
+          当前默认设置：dry_run_default=
+          <strong><?= (int)db_get_setting('stock_dry_run_default','0') ?></strong>，
+          limit_default=
+          <strong><?= (int)db_get_setting('stock_limit_default','0') ?></strong>
         </div>
       </section>
 
@@ -1763,7 +1976,7 @@ WantedBy=multi-user.target') ?></pre>
       ?>
       <section class="mb16">
         <h3 class="mt6 mb8">历史执行记录</h3>
-        <form method="get" class="row gap8 items-center wrap mb8">
+        <form method="get" class="row gap8 items-start wrap mb8">
           <input type="hidden" name="tab" value="stock">
           <div>
             <label class="small">开始时间</label>
@@ -1789,9 +2002,12 @@ WantedBy=multi-user.target') ?></pre>
               <?php endforeach; ?>
             </select>
           </div>
-          <button class="btn" type="submit">筛选</button>
-          <a class="btn btn-secondary" href="?tab=stock">重置</a>
-          <a class="btn" href="?tab=stock&export=stock_logs<?= $where?('&'.http_build_query(['logs_from'=>$from,'logs_to'=>$to,'logs_code'=>$codeFilter,'logs_page_size'=>$logsPageSize])):'' ?>">导出CSV</a>
+          <div class="row gap8 logs-actions">
+            <button class="btn" type="submit">筛选</button>
+            <button class="btn" type="submit" title="刷新列表">刷新</button>
+            <a class="btn btn-secondary" href="?tab=stock">重置</a>
+            <a class="btn" href="?tab=stock&export=stock_logs<?= $where?('&'.http_build_query(['logs_from'=>$from,'logs_to'=>$to,'logs_code'=>$codeFilter,'logs_page_size'=>$logsPageSize])):'' ?>">导出CSV</a>
+          </div>
         </form>
         <table class="table">
           <thead>

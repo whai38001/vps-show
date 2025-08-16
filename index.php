@@ -35,8 +35,9 @@ foreach ($rawLocations as $row) {
 
 // Sorting & pagination
 $sort = isset($_GET['sort']) ? trim($_GET['sort']) : 'default';
-$allowedSort = [
-  'default' => 'p.sort_order ASC, p.id DESC',
+ $allowedSort = [
+  // Default: by price ascending (non-null first)
+  'default' => 'p.price IS NULL ASC, p.price ASC, p.id DESC',
   'price_asc' => 'p.price ASC',
   'price_desc' => 'p.price DESC',
   'newest' => 'p.id DESC',
@@ -48,7 +49,11 @@ $allowedSort = [
   'storage_desc' => 'p.storage_gb IS NULL ASC, p.storage_gb DESC, p.id DESC',
   'storage_asc' => 'p.storage_gb IS NULL ASC, p.storage_gb ASC, p.id DESC',
 ];
-$orderBy = $allowedSort[$sort] ?? $allowedSort['default'];
+ $orderBy = $allowedSort[$sort] ?? $allowedSort['default'];
+ // Group by vendor only for default sorting
+ if ($sort === 'default') {
+   $orderBy = 'v.name ASC, ' . $orderBy;
+ }
 
 $page = max(1, (int)($_GET['page'] ?? 1));
 $pageSize = min(48, max(6, (int)($_GET['page_size'] ?? 12)));
@@ -236,14 +241,14 @@ $plans = $stmt->fetchAll();
             <?php if (!empty($plan['location'])): ?>
               <div class="meta">📍 <?= htmlspecialchars(i18n_text((string)$plan['location'])) ?></div>
             <?php endif; ?>
-            <?php $details = (string)($plan['details_url'] ?? ''); $hasStock = isset($plan['stock_status']) && $plan['stock_status']; ?>
+            <?php $details = (string)($plan['details_url'] ?? ''); ?>
             <div class="price-row">
               <div class="row items-center gap8">
                 <div class="price">
                   <span class="amount">$<?= number_format((float)$plan['price'], 2) ?></span>
                   <span class="duration"><?= htmlspecialchars(i18n_duration_label($plan['price_duration'])) ?></span>
                 </div>
-                <?php if ($hasStock): ?>
+                <?php if (array_key_exists('stock_status', $plan)): ?>
                   <div class="meta" title="<?= htmlspecialchars(t('stock_status')) ?>">
                     <?php if ($plan['stock_status'] === 'in'): ?>
                       <span class="chip chip-in"><?= htmlspecialchars(t('in_stock')) ?></span>

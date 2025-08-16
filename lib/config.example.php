@@ -17,6 +17,10 @@ if (!defined('SITE_NAME')) { define('SITE_NAME', 'VPS Deals'); }
 // CORS (public APIs)
 if (!defined('CORS_ALLOW_ORIGIN')) { define('CORS_ALLOW_ORIGIN', '*'); }
 
+// Timezone (affects PHP date/time functions and logs)
+if (!defined('TIMEZONE')) { define('TIMEZONE', 'Asia/Shanghai'); }
+if (function_exists('date_default_timezone_set')) { @date_default_timezone_set(TIMEZONE); }
+
 // Base path/url helpers
 if (!defined('BASE_PATH')) { define('BASE_PATH', dirname(__DIR__)); }
 if (!defined('BASE_URL')) {
