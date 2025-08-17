@@ -113,6 +113,7 @@ function db_init_schema(): void {
         $existing = array_fill_keys(array_map(function($r){ return (string)$r['COLUMN_NAME']; }, $cols->fetchAll()), true);
         $alters = [];
         if (!isset($existing['cpu'])) { $alters[] = 'ADD COLUMN cpu VARCHAR(191) NULL'; }
+        if (!isset($existing['price_currency'])) { $alters[] = "ADD COLUMN price_currency ENUM('USD','GBP','EUR','CNY') NOT NULL DEFAULT 'USD'"; }
         if (!isset($existing['details_url'])) { $alters[] = 'ADD COLUMN details_url VARCHAR(255) NULL'; }
         if (!isset($existing['ram'])) { $alters[] = 'ADD COLUMN ram VARCHAR(191) NULL'; }
         if (!isset($existing['storage'])) { $alters[] = 'ADD COLUMN storage VARCHAR(191) NULL'; }

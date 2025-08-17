@@ -17,28 +17,33 @@ send_common_security_headers();
   <div class="container">
     <nav class="topnav">
       <div class="nav-left">
-        <a class="brand-link" href="/">首页</a>
-        <a href="https://www.itdianbao.com" target="_blank" rel="noopener">博客</a>
-        <a href="/pages/disclaimer.php">免责声明</a>
-        <a href="/pages/privacy.php">隐私保护</a>
-        <a href="/pages/about.php" class="active">关于</a>
+        <a class="brand-link" href="/"><?= htmlspecialchars(t('home')) ?></a>
+        <a href="https://www.itdianbao.com" target="_blank" rel="noopener"><?= htmlspecialchars(t('blog')) ?></a>
+        <a href="/pages/disclaimer.php"><?= htmlspecialchars(t('disclaimer')) ?></a>
+        <a href="/pages/privacy.php"><?= htmlspecialchars(t('privacy')) ?></a>
+        <a href="/pages/about.php" class="active"><?= htmlspecialchars(t('about')) ?></a>
       </div>
       <div class="nav-right">
         <a class="btn" href="<?= i18n_build_lang_url('zh') ?>"><?= htmlspecialchars(t('lang_zh')) ?></a>
         <a class="btn" href="<?= i18n_build_lang_url('en') ?>">EN</a>
+        <button class="btn btn-secondary btn-small" id="theme-toggle" type="button" aria-label="Toggle theme">切换主题</button>
         <a class="btn btn-secondary" href="/admin/">&nbsp;<?= htmlspecialchars(t('admin_panel')) ?></a>
       </div>
     </nav>
   </div>
   <div class="container page">
     <section class="hero">
-      <h1>关于本站 <span class="badge">About</span></h1>
+      <h1><?= htmlspecialchars(t('about_this_site')) ?> <span class="badge">About</span></h1>
       <div class="desc">聚合 VPS 套餐，帮你更快做出更优选择。</div>
+      <div class="row items-center gap8 mt10">
+        <button class="btn btn-small btn-secondary" type="button" data-brand="theme-link" aria-label="配色：Link">Link</button>
+        <button class="btn btn-small btn-secondary" type="button" data-brand="theme-ocean" aria-label="配色：Ocean">Ocean</button>
+      </div>
     </section>
 
     <div class="prose">
       <div class="toc">
-        <strong>目录</strong>
+        <strong><?= htmlspecialchars(t('about')) ?></strong>
         <ul>
           <li><a href="#features">功能亮点</a></li>
           <li><a href="#roadmap">路线图</a></li>

@@ -30,31 +30,41 @@ $csrf = auth_get_csrf_token();
   <link rel="stylesheet" href="../assets/style.css">
 </head>
 <body>
-  <div class="container maxw420">
-    <div class="header">
-      <div class="brand">
-        <img src="../assets/emoji/key.svg" alt="login" width="36" height="36">
-        <h1>管理员登录</h1>
+  <div class="auth-wrap">
+    <div class="auth-card reveal">
+      <div class="auth-header">
+        <img src="../assets/emoji/key.svg" alt="login" width="40" height="40">
+        <div>
+          <h1 class="auth-title">管理员登录</h1>
+          <div class="auth-desc">安全访问后台 · <?= htmlspecialchars(SITE_NAME) ?></div>
+        </div>
       </div>
-      <div><a class="btn" href="../">返回首页</a></div>
+      <?php if ($error): ?>
+        <div class="alert alert-error"><?= htmlspecialchars($error) ?></div>
+      <?php endif; ?>
+      <form class="auth-form" method="post">
+        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
+        <div>
+          <label>用户名</label>
+          <input class="input" type="text" name="username" autofocus required>
+        </div>
+        <div>
+          <label>密码</label>
+          <input class="input" type="password" name="password" required>
+        </div>
+        <div class="auth-actions">
+          <button class="btn" type="submit">登录</button>
+          <a class="btn btn-secondary" href="../">返回首页</a>
+        </div>
+        <div class="auth-links small">
+          <button class="btn btn-small btn-secondary" id="theme-toggle" type="button" aria-label="Toggle theme">切换主题</button>
+          <div class="row items-center gap8">
+            <button class="btn btn-small btn-secondary" type="button" data-brand="theme-link" aria-label="配色：Link">Link</button>
+            <button class="btn btn-small btn-secondary" type="button" data-brand="theme-ocean" aria-label="配色：Ocean">Ocean</button>
+          </div>
+        </div>
+      </form>
     </div>
-    <?php if ($error): ?>
-      <div class="alert alert-error"><?= htmlspecialchars($error) ?></div>
-    <?php endif; ?>
-    <form method="post">
-      <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
-      <div>
-        <label>用户名</label>
-        <input class="input" type="text" name="username" autofocus required>
-      </div>
-      <div class="mt10">
-        <label>密码</label>
-        <input class="input" type="password" name="password" required>
-      </div>
-      <div class="mt12">
-        <button class="btn" type="submit">登录</button>
-      </div>
-    </form>
   </div>
 </body>
 </html>

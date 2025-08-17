@@ -27,19 +27,7 @@ function render_pagination(array $opts): void {
     $renderLink(1, t('first_page'), $page<=1);
     $renderLink(max(1, $page-1), t('prev_page'), $page<=1);
 
-    $start = max(1, $page - $window); $end = min($totalPages, $page + $window);
-    if ($start > 1) {
-        $renderLink(1, '1', $page===1);
-        if ($start > 2) { echo '<span class="muted small ellipsis">…</span>'; }
-    }
-    for ($i = $start; $i <= $end; $i++) {
-        if ($i === 1 || $i === $totalPages) { continue; }
-        $renderLink($i, (string)$i, $i===$page);
-    }
-    if ($end < $totalPages) {
-        if ($end < $totalPages - 1) { echo '<span class="muted small ellipsis">…</span>'; }
-        $renderLink($totalPages, (string)$totalPages, $page===$totalPages);
-    }
+    // Remove middle numeric page buttons to avoid persistent '2' link.
 
     echo '<span class="muted opacity-60 self-center">' . str_replace(['{x}','{y}'], [$page, $totalPages], t('page_x_of_y')) . ' · ' . t('total_items', ['n' => $totalItems]) . '</span>';
     $renderLink(min($totalPages, $page+1), t('next_page'), $page>=$totalPages);

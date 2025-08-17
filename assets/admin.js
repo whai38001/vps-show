@@ -21,6 +21,22 @@
           e.preventDefault();
         }
       });
+      // Auto-search on typing for inputs with .js-auto-search (debounced)
+      (function(){
+        var timer = null;
+        document.addEventListener('input', function(e){
+          var t = e.target; if(!(t instanceof HTMLInputElement)) return;
+          if(!t.classList.contains('js-auto-search')) return;
+          clearTimeout(timer);
+          timer = setTimeout(function(){
+            var f = t.form; if(f){
+              // reset page to 1 when searching
+              var pageInput = f.querySelector('input[name="plans_page"]'); if(pageInput){ pageInput.value = '1'; }
+              f.submit();
+            }
+          }, 400);
+        });
+      })();
       // Select-all for bulk checkboxes
       document.addEventListener('change', function(e){
         var t = e.target;

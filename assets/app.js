@@ -3,6 +3,12 @@
   try{
     var savedTheme = localStorage.getItem('theme');
     if(savedTheme){ document.documentElement.classList.toggle('light', savedTheme === 'light'); }
+    var savedBrand = localStorage.getItem('brand');
+    if(savedBrand){
+      document.documentElement.classList.add(savedBrand);
+    } else {
+      document.documentElement.classList.add('theme-link');
+    }
     document.addEventListener('DOMContentLoaded', function(){
       var themeBtn = document.getElementById('theme-toggle');
       if(themeBtn){
@@ -11,6 +17,17 @@
           try{ localStorage.setItem('theme', isLight ? 'light' : 'dark'); }catch(e){}
         });
       }
+      var brandBtns = document.querySelectorAll('[data-brand]');
+      brandBtns.forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var brand = btn.getAttribute('data-brand');
+          if(!brand) return;
+          // Remove known brand classes then add
+          document.documentElement.classList.remove('theme-link','theme-ocean');
+          document.documentElement.classList.add(brand);
+          try{ localStorage.setItem('brand', brand); }catch(e){}
+        });
+      });
     });
   }catch(e){}
   function onScroll(){
@@ -380,6 +397,24 @@
   window.addEventListener('resize', onResize);
   window.addEventListener('orientationchange', onResize);
   document.addEventListener('DOMContentLoaded', function(){ onResize(); onScroll(); initCompare(); initCspSafeAutoSubmit(); initCspSafeConfirm(); });
+  // Reveal animation: observe elements and toggle .visible
+  try{
+    var revealTargets = [];
+    document.addEventListener('DOMContentLoaded', function(){
+      // auto-mark common blocks
+      revealTargets = Array.from(document.querySelectorAll('.hero, .card, .footer-inner, .filters, .compare-bar, .compare-modal .modal-content, .page .prose, nav.topnav'));
+      revealTargets.forEach(function(el){ el.classList.add('reveal'); });
+      if ('IntersectionObserver' in window) {
+        var io = new IntersectionObserver(function(entries){
+          entries.forEach(function(entry){ if(entry.isIntersecting){ entry.target.classList.add('visible'); io.unobserve(entry.target); } });
+        }, { rootMargin: '0px 0px -10% 0px', threshold: 0.01 });
+        revealTargets.forEach(function(el){ io.observe(el); });
+      } else {
+        // Fallback: show immediately
+        revealTargets.forEach(function(el){ el.classList.add('visible'); });
+      }
+    });
+  }catch(e){}
   // Back-to-top binding
   try{
     document.addEventListener('DOMContentLoaded', function(){

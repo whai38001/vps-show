@@ -51,6 +51,7 @@ Response:
         "title": "2.5GB",
         "subtitle": "KVM VPS",
         "price": 18.93,
+        "price_currency": "USD",
         "price_duration": "per year",
         "order_url": "https://...",
         "location": "Multiple Locations",
@@ -72,6 +73,7 @@ Response:
 
 Notes:
 - `cpu_cores`, `ram_mb`, `storage_gb` may be `null` when not available.
+- `price_currency` is one of `USD` | `GBP` | `EUR` | `CNY`. Default `USD` when absent (older records).
 
 Headers:
 - `Cache-Control: public, max-age=30, stale-while-revalidate=60`

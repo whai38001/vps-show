@@ -170,6 +170,10 @@ function derive_specs_from_features($features): array {
 
 // Sanitize: ensure features is array when JSON stored and derive structured specs
 foreach ($plans as &$plan) {
+    // Ensure price_currency present with default USD for older schemas
+    if (!isset($plan['price_currency']) || $plan['price_currency'] === null || $plan['price_currency'] === '') {
+        $plan['price_currency'] = 'USD';
+    }
     if (isset($plan['features']) && is_string($plan['features'])) {
         $decoded = json_decode($plan['features'], true);
         if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {

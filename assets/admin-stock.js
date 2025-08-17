@@ -74,6 +74,35 @@
     });
   }
 
+  // Test token button: sends a lightweight HEAD/GET request via backend to validate Authorization header
+  // Delegate token test to support multiple test buttons on the page
+  document.addEventListener('click', async function(e){
+    var t = e.target; if(!(t instanceof HTMLElement)) return;
+    if(t.getAttribute('data-action') !== 'test-token') return;
+    e.preventDefault();
+    var btn = t; var out = t.parentElement?.querySelector('.token-test-result') || document.querySelector('.token-test-result');
+    btn.disabled = true; if(out) out.textContent = '测试中...';
+    try{
+      const form = new FormData();
+      const csrf = (document.querySelector('input[name="_csrf"]').value || '');
+      form.append('_csrf', csrf);
+      form.append('action', 'stock_test_token');
+      form.append('ajax', '1');
+      const resp = await fetch(location.href, { method: 'POST', body: form, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      let data = null; try { data = await resp.json(); } catch(e) {}
+      if (!resp.ok || !data) {
+        out && (out.textContent = '测试失败: HTTP ' + resp.status);
+      } else if (data.code !== 0) {
+        out && (out.textContent = '无效或过期: ' + (data.message||''));
+      } else {
+        out && (out.textContent = '有效');
+        // Hide token expired hint if present
+        try{ var hint = document.getElementById('token-expired-hint'); if(hint){ hint.classList.add('hidden'); hint.textContent=''; } }catch(e){}
+      }
+    }catch(e){ out && (out.textContent = '异常: ' + e); }
+    finally{ btn.disabled = false; }
+  });
+
   // Stock settings form: intercept submit to avoid inline onsubmit
   const form = qs('form-stock-settings');
   if (form) {

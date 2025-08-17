@@ -130,16 +130,16 @@ $plans = $stmt->fetchAll();
   <div class="container">
     <nav class="topnav">
       <div class="nav-left">
-        <a class="brand-link active" href="/">首页</a>
-        <a href="https://www.itdianbao.com" target="_blank" rel="noopener">博客</a>
-        <a href="/pages/disclaimer.php">免责声明</a>
-        <a href="/pages/privacy.php">隐私保护</a>
-        <a href="/pages/about.php">关于</a>
+        <a class="brand-link active" href="/"><?= htmlspecialchars(t('home')) ?></a>
+        <a href="https://www.itdianbao.com" target="_blank" rel="noopener"><?= htmlspecialchars(t('blog')) ?></a>
+        <a href="/pages/disclaimer.php"><?= htmlspecialchars(t('disclaimer')) ?></a>
+        <a href="/pages/privacy.php"><?= htmlspecialchars(t('privacy')) ?></a>
+        <a href="/pages/about.php"><?= htmlspecialchars(t('about')) ?></a>
       </div>
       <div class="nav-right">
         <a class="btn" href="?<?= htmlspecialchars(http_build_query(array_merge($_GET, ['lang'=>'zh']))) ?>"><?= htmlspecialchars(t('lang_zh')) ?></a>
         <a class="btn" href="?<?= htmlspecialchars(http_build_query(array_merge($_GET, ['lang'=>'en']))) ?>">EN</a>
-        <button class="btn btn-secondary btn-small" id="theme-toggle" type="button" aria-label="Toggle theme">切换主题</button>
+        <button class="btn btn-secondary btn-small" id="theme-toggle" type="button" aria-label="Toggle theme"><?= htmlspecialchars(t('toggle_theme')) ?></button>
         <a class="btn btn-secondary" href="admin/"><?= htmlspecialchars(t('admin_panel')) ?></a>
       </div>
     </nav>
@@ -155,6 +155,23 @@ $plans = $stmt->fetchAll();
         <?php endif; ?>
       </form>
     </header>
+    <section class="hero">
+      <h1>
+        <?= htmlspecialchars(t('site_title')) ?>
+        <span class="badge">Modern UI</span>
+      </h1>
+      <p class="desc">
+        <?= htmlspecialchars(t('search_placeholder')) ?> · <?= htmlspecialchars(t('filters_all_vendors')) ?> · <?= htmlspecialchars(t('sort_default')) ?>
+      </p>
+      <div class="row items-center gap8 mt10">
+        <a class="btn" href="#plans"><?= htmlspecialchars(t('filter_button')) ?></a>
+        <a class="btn btn-secondary" href="/pages/about.php"><?= htmlspecialchars(t('learn_more')) ?></a>
+        <div class="row items-center gap8">
+          <button class="btn btn-small btn-secondary" type="button" data-brand="theme-link" aria-label="配色：Link">Link</button>
+          <button class="btn btn-small btn-secondary" type="button" data-brand="theme-ocean" aria-label="配色：Ocean">Ocean</button>
+        </div>
+      </div>
+    </section>
 
     <div class="filters">
       <form method="get">
@@ -217,9 +234,9 @@ $plans = $stmt->fetchAll();
       </form>
     </div>
 
-    <main class="grid">
+    <main class="grid" id="plans">
       <?php foreach ($plans as $plan): ?>
-        <article class="card" data-plan-id="<?= (int)$plan['id'] ?>">
+        <article class="card pricing" data-plan-id="<?= (int)$plan['id'] ?>">
           <?php if (!empty($plan['highlights'])): ?>
             <div class="ribbon"><?= htmlspecialchars(i18n_text((string)$plan['highlights'])) ?></div>
           <?php endif; ?>
@@ -245,7 +262,8 @@ $plans = $stmt->fetchAll();
             <div class="price-row">
               <div class="row items-center gap8">
                 <div class="price">
-                  <span class="amount">$<?= number_format((float)$plan['price'], 2) ?></span>
+                  <?php $pc = isset($plan['price_currency']) ? (string)$plan['price_currency'] : 'USD'; $sym = ($pc==='GBP'?'£':($pc==='EUR'?'€':($pc==='CNY'?'¥':'$'))); ?>
+                  <span class="amount"><?= $sym ?><?= number_format((float)$plan['price'], 2) ?></span>
                   <span class="duration"><?= htmlspecialchars(i18n_duration_label($plan['price_duration'])) ?></span>
                 </div>
                 <?php if (array_key_exists('stock_status', $plan)): ?>
@@ -385,7 +403,7 @@ $plans = $stmt->fetchAll();
       // Recently added: last 6 by updated_at
       $recent = $pdo->query('SELECT p.*, v.name AS vendor_name, v.logo_url, v.website FROM plans p INNER JOIN vendors v ON v.id=p.vendor_id ORDER BY p.updated_at DESC LIMIT 6')->fetchAll();
       if ($recent): ?>
-      <section class="mt24">
+      <section class="mt24 home-recent">
         <h2 class="mb12 text-lg"><?= htmlspecialchars(t('recently_added')) ?></h2>
         <div class="grid grid-260">
           <?php foreach ($recent as $r): ?>
@@ -407,7 +425,8 @@ $plans = $stmt->fetchAll();
               </div>
               <div class="card-footer">
                 <div class="price">
-                  <span class="amount">$<?= number_format((float)$r['price'], 2) ?></span>
+                  <?php $rpc = isset($r['price_currency']) ? (string)$r['price_currency'] : 'USD'; $rsym = ($rpc==='GBP'?'£':($rpc==='EUR'?'€':($rpc==='CNY'?'¥':'$'))); ?>
+                  <span class="amount"><?= $rsym ?><?= number_format((float)$r['price'], 2) ?></span>
                   <span class="duration"><?= htmlspecialchars(i18n_duration_label($r['price_duration'])) ?></span>
                 </div>
                 <a class="btn" href="<?= htmlspecialchars($r['order_url'] ?: '#') ?>" target="_blank" rel="nofollow noopener"><?= htmlspecialchars(t('order_now')) ?></a>

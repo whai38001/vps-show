@@ -141,11 +141,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($vendor_id > 0 && $title !== '' && $price > 0) {
             if ($id > 0) {
-                $stmt = $pdo->prepare('UPDATE plans SET vendor_id=:vendor_id,title=:title,subtitle=:subtitle,price=:price,price_duration=:d,details_url=:du,order_url=:url,location=:loc,features=:f,cpu=:cpu,ram=:ram,storage=:storage,cpu_cores=:cpu_cores,ram_mb=:ram_mb,storage_gb=:storage_gb,highlights=:h,sort_order=:s WHERE id=:id');
-                $stmt->execute([':vendor_id'=>$vendor_id, ':title'=>$title, ':subtitle'=>$subtitle, ':price'=>$price, ':d'=>$price_duration, ':du'=>$details_url, ':url'=>$order_url, ':loc'=>$location, ':f'=>json_encode($features, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ':cpu'=>$cpu, ':ram'=>$ram, ':storage'=>$storage, ':cpu_cores'=>$cpu_cores, ':ram_mb'=>$ram_mb, ':storage_gb'=>$storage_gb, ':h'=>$highlights, ':s'=>$sort_order, ':id'=>$id]);
+                $stmt = $pdo->prepare('UPDATE plans SET vendor_id=:vendor_id,title=:title,subtitle=:subtitle,price=:price,price_currency=:pc,price_duration=:d,details_url=:du,order_url=:url,location=:loc,features=:f,cpu=:cpu,ram=:ram,storage=:storage,cpu_cores=:cpu_cores,ram_mb=:ram_mb,storage_gb=:storage_gb,highlights=:h,sort_order=:s WHERE id=:id');
+                $stmt->execute([':vendor_id'=>$vendor_id, ':title'=>$title, ':subtitle'=>$subtitle, ':price'=>$price, ':pc'=>($_POST['price_currency'] ?? 'USD'), ':d'=>$price_duration, ':du'=>$details_url, ':url'=>$order_url, ':loc'=>$location, ':f'=>json_encode($features, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ':cpu'=>$cpu, ':ram'=>$ram, ':storage'=>$storage, ':cpu_cores'=>$cpu_cores, ':ram_mb'=>$ram_mb, ':storage_gb'=>$storage_gb, ':h'=>$highlights, ':s'=>$sort_order, ':id'=>$id]);
             } else {
-                $stmt = $pdo->prepare('INSERT INTO plans (vendor_id,title,subtitle,price,price_duration,details_url,order_url,location,features,cpu,ram,storage,cpu_cores,ram_mb,storage_gb,highlights,sort_order) VALUES (:vendor_id,:title,:subtitle,:price,:d,:du,:url,:loc,:f,:cpu,:ram,:storage,:cpu_cores,:ram_mb,:storage_gb,:h,:s)');
-                $stmt->execute([':vendor_id'=>$vendor_id, ':title'=>$title, ':subtitle'=>$subtitle, ':price'=>$price, ':d'=>$price_duration, ':du'=>$details_url, ':url'=>$order_url, ':loc'=>$location, ':f'=>json_encode($features, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ':cpu'=>$cpu, ':ram'=>$ram, ':storage'=>$storage, ':cpu_cores'=>$cpu_cores, ':ram_mb'=>$ram_mb, ':storage_gb'=>$storage_gb, ':h'=>$highlights, ':s'=>$sort_order]);
+                $stmt = $pdo->prepare('INSERT INTO plans (vendor_id,title,subtitle,price,price_currency,price_duration,details_url,order_url,location,features,cpu,ram,storage,cpu_cores,ram_mb,storage_gb,highlights,sort_order) VALUES (:vendor_id,:title,:subtitle,:price,:pc,:d,:du,:url,:loc,:f,:cpu,:ram,:storage,:cpu_cores,:ram_mb,:storage_gb,:h,:s)');
+                $stmt->execute([':vendor_id'=>$vendor_id, ':title'=>$title, ':subtitle'=>$subtitle, ':price'=>$price, ':pc'=>($_POST['price_currency'] ?? 'USD'), ':d'=>$price_duration, ':du'=>$details_url, ':url'=>$order_url, ':loc'=>$location, ':f'=>json_encode($features, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES), ':cpu'=>$cpu, ':ram'=>$ram, ':storage'=>$storage, ':cpu_cores'=>$cpu_cores, ':ram_mb'=>$ram_mb, ':storage_gb'=>$storage_gb, ':h'=>$highlights, ':s'=>$sort_order]);
             }
         }
         flash_set('success', '套餐已保存');
@@ -845,6 +845,99 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $jsonOut(0, '执行成功', ['exit'=>$exitCode,'output'=>$msg,'cmd'=>$cmdArgs]);
     }
 
+    // Test token validity using current settings (simple HEAD/GET)
+    if (isset($_POST['action']) && $_POST['action'] === 'stock_test_token') {
+        $isAjax = (isset($_POST['ajax']) && $_POST['ajax'] === '1');
+        $jsonOut = function(int $code, string $msg, array $data=[]) use ($isAjax) {
+            if ($isAjax && !headers_sent()) { header('Content-Type: application/json; charset=utf-8'); }
+            echo json_encode(['code'=>$code,'message'=>$msg,'data'=>$data], JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+            exit;
+        };
+        $endpoint = trim((string)db_get_setting('stock_endpoint', ''));
+        $method = strtoupper((string)db_get_setting('stock_method', 'GET'));
+        $auth = (string)db_get_setting('stock_auth_header', '');
+        $query = (string)db_get_setting('stock_query', '');
+        if ($endpoint === '') { $jsonOut(400, '未配置接口地址'); }
+        // Build headers consistent with stock_sync_run
+        $headers = [];
+        if ($method === 'POST' && $query !== '') { $headers[] = 'Content-Type: application/x-www-form-urlencoded'; }
+        if ($auth) {
+            $auth = str_replace(["\r\n", "\r"], "\n", $auth);
+            $authLines = explode("\n", $auth);
+            foreach ($authLines as $line) {
+                $line = trim($line);
+                if ($line === '') { continue; }
+                if (preg_match('/^[A-Za-z0-9-]+\s*:/', $line)) { $headers[] = $line; }
+                else { $headers[] = 'Authorization: ' . $line; }
+            }
+        }
+        $headers[] = 'Accept: application/json';
+        // Build URL/content same as sync
+        $url = $endpoint; $content = null;
+        if ($method === 'GET' && $query !== '') { $url .= (strpos($url, '?') === false ? '?' : '&') . $query; }
+        elseif ($method === 'POST' && $query !== '') { $content = $query; }
+        $ch = @curl_init();
+        if ($ch === false) { $jsonOut(500, '服务器未安装 cURL'); }
+        @curl_setopt($ch, CURLOPT_URL, $url);
+        @curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        @curl_setopt($ch, CURLOPT_HEADER, true);
+        @curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        @curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        @curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
+        @curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+        @curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        if ($method === 'POST' && $content !== null) { @curl_setopt($ch, CURLOPT_POSTFIELDS, $content); }
+        $resp = @curl_exec($ch);
+        if ($resp === false) {
+            $err = @curl_error($ch);
+            if (stripos((string)$err, 'SSL') !== false || stripos((string)$err, 'certificate') !== false) {
+                @curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                @curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+                $resp = @curl_exec($ch);
+            }
+        }
+        $status = (int)@curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        @curl_close($ch);
+        if ($resp === false) { $jsonOut(500, '请求失败: ' . $err); }
+        if ($status === 401 || $status === 403) { $jsonOut(401, '未授权/令牌过期'); }
+        try{ db_set_setting('stock_token_last_ok_at', date('Y-m-d H:i:s')); }catch(Throwable $e){}
+        if ($status >= 400) { $jsonOut($status, 'HTTP ' . $status); }
+        $jsonOut(0, 'OK', ['status'=>$status]);
+    }
+
+    // Health: download logs
+    if (isset($_POST['action']) && $_POST['action'] === 'download_log') {
+        $which = isset($_POST['which']) ? trim((string)$_POST['which']) : '';
+        $map = [
+            'php_error' => BASE_PATH . '/log/php-error.log',
+            'stock_cron' => BASE_PATH . '/log/stock_cron.log',
+        ];
+        if (!isset($map[$which])) { flash_set('error', '未知日志类型'); redirect_same(); }
+        $file = $map[$which];
+        if (!@is_file($file)) { flash_set('error', '日志文件不存在'); redirect_same(); }
+        if (!headers_sent()) {
+            header('Content-Type: text/plain; charset=utf-8');
+            header('Content-Disposition: attachment; filename="' . basename($file) . '"');
+        }
+        @readfile($file);
+        exit;
+    }
+
+    // Health: clear logs
+    if (isset($_POST['action']) && $_POST['action'] === 'clear_log') {
+        $which = isset($_POST['which']) ? trim((string)$_POST['which']) : '';
+        $map = [
+            'php_error' => BASE_PATH . '/log/php-error.log',
+            'stock_cron' => BASE_PATH . '/log/stock_cron.log',
+        ];
+        if (!isset($map[$which])) { flash_set('error', '未知日志类型'); redirect_same(); }
+        $file = $map[$which];
+        $ok = @file_put_contents($file, '') !== false;
+        if ($ok) { flash_set('success', '已清空日志：' . basename($file)); }
+        else { flash_set('error', '清空失败或无权限：' . basename($file)); }
+        redirect_same();
+    }
+
     // Import: Vendors (JSON or CSV)
     if (isset($_POST['action']) && $_POST['action'] === 'import_vendors') {
         if (!isset($_FILES['file']) || !is_uploaded_file($_FILES['file']['tmp_name'])) {
@@ -1256,38 +1349,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
     <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
   <title>管理后台 - <?= htmlspecialchars(SITE_NAME) ?></title>
   <link rel="stylesheet" href="../assets/style.css">
+  <script defer src="../assets/app.js"></script>
   <script defer src="../assets/admin.js"></script>
 </head>
 <body>
   <div class="container">
+    <nav class="topnav">
+      <div class="nav-left">
+        <a class="brand-link" href="../">返回前台</a>
+        <a class="btn btn-secondary" href="../pages/disclaimer.php">免责声明</a>
+        <a class="btn btn-secondary" href="../pages/privacy.php">隐私保护</a>
+      </div>
+      <div class="nav-right">
+        <span class="muted small">当前账号：<?= htmlspecialchars($_SESSION['admin_username'] ?? ADMIN_USERNAME) ?></span>
+        <button class="btn btn-secondary btn-small" id="theme-toggle" type="button" aria-label="Toggle theme">切换主题</button>
+        <a class="btn" href="./logout.php">退出登录</a>
+      </div>
+    </nav>
     <?php if ($flash = flash_get()): ?>
       <div class="alert <?= $flash['type']==='error' ? 'alert-error' : 'alert-success' ?>">
         <?= htmlspecialchars($flash['message']) ?>
       </div>
     <?php endif; ?>
-    <div class="header">
-      <div class="brand">
-        <img src="../assets/emoji/memo.svg" alt="admin" width="36" height="36">
-        <h1>管理后台</h1>
-      </div>
-      <div class="row items-center gap8">
-        <span class="muted small">当前账号：<?= htmlspecialchars($_SESSION['admin_username'] ?? ADMIN_USERNAME) ?></span>
-        <a class="btn" href="../">返回前台</a>
-        <a class="btn" href="./logout.php">退出登录</a>
-      </div>
-    </div>
+    <section class="hero">
+      <h1>管理后台 <span class="badge">Dashboard</span></h1>
+      <p class="desc">集中管理厂商与套餐 · 同步库存 · 导入导出</p>
+    </section>
 
     <nav class="row wrap gap8 mb16">
-      <a class="btn" href="?tab=vendors">厂商管理</a>
-      <a class="btn" href="?tab=plans">套餐管理</a>
-      <a class="btn" href="?tab=account">账号设置</a>
-      <a class="btn" href="../scripts/import_url.php" target="_blank">通用导入 URL</a>
-      <a class="btn" href="?tab=data">数据导入导出</a>
-      <a class="btn" href="?tab=stock">库存同步</a>
+      <a class="btn <?= $tab==='vendors'?'':'btn-secondary' ?>" href="?tab=vendors">厂商管理</a>
+      <a class="btn <?= $tab==='plans'?'':'btn-secondary' ?>" href="?tab=plans">套餐管理</a>
+      <a class="btn <?= $tab==='account'?'':'btn-secondary' ?>" href="?tab=account">账号设置</a>
+      <a class="btn btn-secondary" href="../scripts/import_url.php" target="_blank" rel="noopener noreferrer">通用导入 URL</a>
+      <a class="btn <?= $tab==='data'?'':'btn-secondary' ?>" href="?tab=data">数据导入导出</a>
+      <a class="btn <?= $tab==='stock'?'':'btn-secondary' ?>" href="?tab=stock">库存同步</a>
+      <a class="btn <?= $tab==='health'?'':'btn-secondary' ?>" href="?tab=health">健康检查</a>
     </nav>
 
     <?php if ($tab === 'vendors'): ?>
-      <section class="mb16">
+      <section class="mb16 panel reveal">
         <h2 class="mt6 mb12">新增/编辑 厂商</h2>
         <form method="post">
           <input type="hidden" name="action" value="vendor_save">
@@ -1318,7 +1418,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
         </form>
       </section>
 
-      <section>
+      <section class="panel reveal">
         <h2 class="mt6 mb12">厂商列表</h2>
         <?php $vendDl = array_intersect_key($_GET, array_flip(['tab','vendor_q','vendors_sort'])); $vendDl['download']='vendors_csv_current'; ?>
         <div class="row wrap items-center gap8 mb8">
@@ -1332,7 +1432,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
             <noscript><button class="btn" type="submit">应用</button></noscript>
           </form>
           <a class="btn" href="?<?= htmlspecialchars(http_build_query($vendDl)) ?>">导出当前筛选 CSV</a>
-          <form method="post" onsubmit="return confirm('确认对所选厂商执行该操作？');" class="row items-center gap8">
+          <form method="post" data-confirm="确认对所选厂商执行该操作？" class="row items-center gap8">
             <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
             <input type="hidden" name="action" value="vendors_bulk_delete">
             <button class="btn btn-danger" type="submit">批量删除</button>
@@ -1401,7 +1501,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
     <?php endif; ?>
 
     <?php if ($tab === 'plans'): ?>
-      <section class="mb24">
+      <section class="mb24 panel reveal">
         <h2 class="mt6 mb12">新增/编辑 套餐</h2>
         <form method="post">
           <input type="hidden" name="action" value="plan_save">
@@ -1430,7 +1530,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
             </div>
             <div>
               <label>价格</label>
-              <input class="input" type="number" step="0.01" name="price" required value="<?= $editingPlan ? htmlspecialchars((string)$editingPlan['price']) : '' ?>">
+              <div class="row items-center gap6">
+                <input class="input" type="number" step="0.01" name="price" required value="<?= $editingPlan ? htmlspecialchars((string)$editingPlan['price']) : '' ?>">
+                <?php $curr = $editingPlan ? (string)($editingPlan['price_currency'] ?? 'USD') : 'USD'; ?>
+                <select name="price_currency" class="input w120">
+                  <?php foreach ([
+                    'USD' => '美元 (USD)',
+                    'GBP' => '英镑 (GBP)',
+                    'EUR' => '欧元 (EUR)',
+                    'CNY' => '人民币 (CNY)'
+                  ] as $k => $label): ?>
+                    <option value="<?= $k ?>" <?= $curr === $k ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
             </div>
             <div>
               <label>计费周期</label>
@@ -1496,7 +1609,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
         </form>
       </section>
 
-      <section>
+      <section class="panel reveal">
         <h2 class="mt6 mb12">套餐列表</h2>
         <form method="get" class="mb8 row wrap gap8 items-center">
           <input type="hidden" name="tab" value="plans">
@@ -1508,7 +1621,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
               <option value="<?= (int)$v['id'] ?>" <?= $planVendorFilter===(int)$v['id']?'selected':'' ?>><?= htmlspecialchars($v['name']) ?></option>
             <?php endforeach; ?>
           </select>
-          <input class="input w220" type="text" name="plan_q" placeholder="搜索标题/副标题" value="<?= htmlspecialchars($planQ) ?>">
+          <input class="input w220 js-auto-search" type="text" name="plan_q" placeholder="搜索标题/副标题（输入后自动搜索）" value="<?= htmlspecialchars($planQ) ?>">
+          <button class="btn" type="submit">搜索</button>
           <select name="plan_stock" class="js-auto-submit">
             <?php $ps = $planStock; ?>
             <option value="">库存（全部）</option>
@@ -1522,7 +1636,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
           <?php $dlqs = array_intersect_key($_GET, array_flip(['tab','plan_vendor','plan_q','plan_stock','plans_sort','plan_min_price','plan_max_price'])); $dlqs['download']='plans_csv_current'; ?>
           <a class="btn" href="?<?= htmlspecialchars(http_build_query($dlqs)) ?>">导出当前筛选 CSV</a>
         </form>
-        <form method="post" onsubmit="return confirm('确认对所选项执行该操作？');">
+        <form method="post" data-confirm="确认对所选项执行该操作？">
           <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
           <input type="hidden" name="action" value="plans_bulk">
           <div class="row wrap items-center gap12 mb8 mt6">
@@ -1582,7 +1696,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
                 <th><a href="<?= htmlspecialchars($makeSort('price_desc')) ?>">价格</a></th>
                 <th>周期</th>
                 <th>库存</th>
-                <th><a href="<?= htmlspecialchars($makeSort('sort_asc')) ?>">排序</a></th>
                 <th>角标</th>
                 <th>详情</th>
                 <th>操作</th>
@@ -1610,7 +1723,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
                     }
                   ?>
                 </td>
-                <td><?= (int)$p['sort_order'] ?></td>
                 <td><?= htmlspecialchars((string)$p['highlights']) ?></td>
                 <td><?php $du=(string)($p['details_url']??''); if($du){ echo '<a href="'.htmlspecialchars($du).'" target="_blank" rel="nofollow noopener">查看</a>'; } ?></td>
                 <td class="admin-actions">
@@ -1660,7 +1772,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
     <?php endif; ?>
 
     <?php if ($tab === 'account'): ?>
-      <section class="mb24">
+      <section class="mb24 panel reveal">
         <h2 class="mt6 mb12">管理员账号设置</h2>
         <form method="post" data-confirm="确认保存账号设置？" class="maxw520">
           <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
@@ -1713,6 +1825,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
         $lastRunAt = db_get_setting('stock_last_run_at', '');
         $lastResultJson = db_get_setting('stock_last_result', '');
         $lastResult = $lastResultJson ? json_decode($lastResultJson, true) : null;
+        $tokenLastOkAt = db_get_setting('stock_token_last_ok_at', '');
+        // Heuristic: detect possibly expired token when there has been no meaningful update for long
+        $logsCheck = [];
+        try {
+            $stmtChk = $pdo->query('SELECT code, updated, run_at FROM stock_logs ORDER BY run_at DESC LIMIT 8');
+            if ($stmtChk) { $logsCheck = $stmtChk->fetchAll(); }
+            // Prefer latest actual log time over setting snapshot
+            $stmtMax = $pdo->query('SELECT MAX(run_at) AS lm FROM stock_logs');
+            $maxRunAt = $stmtMax ? (string)$stmtMax->fetchColumn() : '';
+            if ($maxRunAt !== '') { $lastRunAt = $maxRunAt; }
+        } catch (Throwable $e) { /* ignore */ }
+        $nowTs = time();
+        $lastRunTs = $lastRunAt ? strtotime($lastRunAt) : 0;
+        $diffMin = $lastRunTs ? (int)floor(($nowTs - $lastRunTs) / 60) : null;
+        $zeroUpdatedRuns = 0; $errRuns = 0;
+        foreach ($logsCheck as $lr) {
+            $c = (int)($lr['code'] ?? 0);
+            $u = (int)($lr['updated'] ?? 0);
+            if ($c === 0 && $u === 0) { $zeroUpdatedRuns++; }
+            if ($c !== 0) { $errRuns++; }
+        }
+        $tokenMaybeExpired = false; $tokenHintMsg = '';
+        // If token tested OK within last 6 hours, suppress expiry hint
+        $lastOkTs = $tokenLastOkAt ? strtotime($tokenLastOkAt) : 0;
+        $okFresh = $lastOkTs && (time() - $lastOkTs) <= (6 * 3600);
+        if (!$okFresh) {
+            if ($diffMin !== null && $diffMin >= 180) { $tokenMaybeExpired = true; $tokenHintMsg = '提示：最近' . (int)$diffMin . ' 分钟无有效更新，可能令牌已过期。'; }
+            if (!$tokenMaybeExpired && $zeroUpdatedRuns >= 5) { $tokenMaybeExpired = true; $tokenHintMsg = '提示：最近多次 0 更新，可能令牌已过期。'; }
+            if (!$tokenMaybeExpired && $errRuns >= 3) { $tokenMaybeExpired = true; $tokenHintMsg = '提示：最近多次接口错误，可能令牌已过期。'; }
+        }
         // Cron environment settings
         $cronMode = db_get_setting('stock_cron_mode', 'host'); // host | docker
         $dockerContainer = db_get_setting('stock_docker_container', 'PHP846');
@@ -1757,7 +1899,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
         exit;
       }
       ?>
-      <section class="mb16">
+      <section class="mb16 panel reveal">
         <h2 class="mt6 mb12">库存接口配置</h2>
         <form method="post" id="form-stock-settings" class="maxw720">
           <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
@@ -1766,7 +1908,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
             <label>接口地址</label>
             <input class="input" type="url" name="endpoint" required placeholder="https://example.com/api/monitors" value="<?= htmlspecialchars($stockEndpoint) ?>">
           </div>
-          <div class="form-row">
+            <div class="form-row">
             <div>
               <label>请求方式</label>
               <select name="method">
@@ -1777,7 +1919,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
             </div>
             <div>
               <label>Authorization 头（可选）</label>
-              <input class="input" type="text" name="auth_header" placeholder="Bearer xxx" value="<?= htmlspecialchars($stockAuth) ?>">
+                <div class="row items-center gap8">
+                  <input class="input" type="text" name="auth_header" placeholder="Bearer xxx" value="<?= htmlspecialchars($stockAuth) ?>">
+                  <button class="btn btn-secondary btn-small" type="button" data-action="test-token">测试令牌</button>
+                  <span class="small muted token-test-result"></span>
+                </div>
+                <?php if (!empty($tokenMaybeExpired) && $tokenHintMsg !== ''): ?>
+                  <div id="token-expired-hint" class="token-hint mt6" title="Token hint">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 2Zm1 15h-2v-2h2Zm0-4h-2V7h2Z"/></svg>
+                    <span><?= htmlspecialchars($tokenHintMsg) ?></span>
+                  </div>
+                <?php else: ?>
+                  <div id="token-expired-hint" class="token-hint mt6 hidden"></div>
+                <?php endif; ?>
             </div>
           </div>
           <div>
@@ -1793,7 +1947,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
         </form>
       </section>
 
-      <section class="mb16">
+      <section class="mb16 panel reveal">
         <h2 class="mt6 mb12">执行同步</h2>
         <div class="maxw720">
           <button class="btn" id="btn-sync-stock" type="button">同步库存</button>
@@ -1813,7 +1967,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
         <script src="../assets/admin-stock.js" defer></script>
       </section>
 
-      <section class="mb16">
+      <section class="mb16 panel reveal">
         <h2 class="mt6 mb12">自动同步设置</h2>
         <form method="post" id="form-stock-auto" class="maxw720">
           <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
@@ -1876,7 +2030,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
         </form>
       </section>
 
-      <section class="mb24">
+      <section class="mb24 panel reveal">
         <h3 class="mt6 mb8">最近一次执行</h3>
         <div class="small text-light">
           时间：<?= htmlspecialchars($lastRunAt ?: 'N/A') ?>；
@@ -1890,7 +2044,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['download'])) {
         </div>
       </section>
 
-      <section class="mb24">
+      <section class="mb24 panel reveal">
         <h3 class="mt6 mb8">服务器定时任务示例</h3>
         <form method="post" class="row gap12 items-end wrap mb8">
           <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
@@ -1974,7 +2128,7 @@ WantedBy=multi-user.target') ?></pre>
         $stmtLogs->execute($params);
         $logs = $stmtLogs->fetchAll();
       ?>
-      <section class="mb16">
+      <section class="mb16 panel reveal">
         <h3 class="mt6 mb8">历史执行记录</h3>
         <form method="get" class="row gap8 items-start wrap mb8">
           <input type="hidden" name="tab" value="stock">
@@ -2046,7 +2200,7 @@ WantedBy=multi-user.target') ?></pre>
     <?php endif; ?>
 
     <?php if ($tab === 'data'): ?>
-      <section class="mb16">
+      <section class="mb16 panel reveal">
         <h2 class="mt6 mb12">导出数据</h2>
         <div class="row wrap gap8">
           <a class="btn" href="?tab=data&download=vendors_json">导出厂商 JSON</a>
@@ -2107,6 +2261,213 @@ WantedBy=multi-user.target') ?></pre>
           </div>
           <div class="mt10"><button class="btn" type="submit">开始导入</button></div>
         </form>
+      </section>
+    <?php endif; ?>
+
+    <?php if ($tab === 'health'): ?>
+      <section class="mb16 panel reveal">
+        <h2 class="mt6 mb12">项目健康检查</h2>
+        <div class="prose">
+          <ul>
+            <li>PHP 错误日志路径：<code><?= htmlspecialchars(BASE_PATH . '/log/php-error.log') ?></code></li>
+            <li>库存日志路径：<code><?= htmlspecialchars(BASE_PATH . '/log/stock_cron.log') ?></code></li>
+            <li>最近一次库存执行：<strong><?= htmlspecialchars($lastRunAt ?: 'N/A') ?></strong></li>
+          </ul>
+          <div class="row items-center gap8 mt10">
+            <form method="post" class="row items-center gap8 wrap" data-confirm="立即执行一次库存同步测试？">
+              <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
+              <input type="hidden" name="action" value="stock_sync_now">
+              <input type="hidden" name="ajax" value="0">
+              <label class="row items-center gap6"><input type="checkbox" name="dry_run" value="1"> 演练模式</label>
+              <label class="row items-center gap6">限制条数 <input class="input w120" type="number" name="limit" min="0" placeholder="0 表示不限制"></label>
+              <button class="btn" type="submit">立即同步测试</button>
+            </form>
+            <button class="btn btn-secondary" id="btn-run-cron" type="button">按当前执行环境测试一次</button>
+          </div>
+        </div>
+      </section>
+      <?php
+        // Quick checks
+        $checks = [];
+        $paths = [ BASE_PATH . '/log', BASE_PATH . '/tmp', BASE_PATH . '/tmp/ratelimit' ];
+        foreach ($paths as $p) {
+          $checks[] = [ 'name' => $p, 'exists' => is_dir($p) || is_file($p), 'writable' => is_writable($p) ];
+        }
+        $errLines = 0; $phpErr = BASE_PATH . '/log/php-error.log';
+        if (@is_file($phpErr)) {
+          $c = @file_get_contents($phpErr);
+          if ($c !== false) { $errLines = substr_count($c, "\n"); }
+        }
+        // PHP runtime & extensions
+        $phpVersion = PHP_VERSION;
+        $exts = [
+          'pdo_mysql' => extension_loaded('pdo_mysql'),
+          'json' => extension_loaded('json'),
+          'curl' => extension_loaded('curl'),
+          'openssl' => extension_loaded('openssl'),
+        ];
+        // Tail helper
+        $tail = function(string $file, int $lines = 20) {
+          if (!@is_file($file)) { return ''; }
+          $content = @file($file, FILE_IGNORE_NEW_LINES);
+          if (!is_array($content)) { return ''; }
+          $slice = array_slice($content, -$lines);
+          return implode("\n", $slice);
+        };
+        $stockLog = BASE_PATH . '/log/stock_cron.log';
+        $stockTail = $tail($stockLog, 30);
+        $phpTail = $tail($phpErr, 30);
+        // System summary
+        $human = function($bytes){
+          $units=['B','KB','MB','GB','TB']; $i=0; $v=max(0,(float)$bytes);
+          while($v>=1024 && $i<count($units)-1){ $v/=1024; $i++; }
+          return sprintf('%.2f %s',$v,$units[$i]);
+        };
+        $diskPath = BASE_PATH;
+        $diskFree = @disk_free_space($diskPath);
+        $diskTotal = @disk_total_space($diskPath);
+        $diskUsed = ($diskFree!==false && $diskTotal!==false) ? ($diskTotal - $diskFree) : null;
+        $memLimit = ini_get('memory_limit');
+        $postMax = ini_get('post_max_size');
+        $uploadMax = ini_get('upload_max_filesize');
+        $execTime = ini_get('max_execution_time');
+      ?>
+      <section class="mb16 panel reveal">
+        <h3 class="mt6 mb8">目录权限</h3>
+        <table class="table">
+          <thead><tr><th>路径</th><th>存在</th><th>可写</th></tr></thead>
+          <tbody>
+          <?php foreach ($checks as $ck): ?>
+            <tr>
+              <td><?= htmlspecialchars($ck['name']) ?></td>
+              <td><?= $ck['exists'] ? '✓' : '✗' ?></td>
+              <td><?= $ck['writable'] ? '✓' : '✗' ?></td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+      </section>
+      <section class="mb24 panel reveal">
+        <h3 class="mt6 mb8">错误日志概览</h3>
+        <div class="small muted">最近错误行数（总）：<?= (int)$errLines ?></div>
+        <div class="small muted mt6">建议配置 logrotate，避免日志过大。</div>
+      </section>
+      <section class="mb16 panel reveal">
+        <h3 class="mt6 mb8">运行环境</h3>
+        <table class="table">
+          <thead><tr><th>项</th><th>值</th></tr></thead>
+          <tbody>
+            <tr><td>PHP 版本</td><td><?= htmlspecialchars($phpVersion) ?></td></tr>
+            <tr><td>扩展 pdo_mysql</td><td><?= $exts['pdo_mysql'] ? '✓' : '✗' ?></td></tr>
+            <tr><td>扩展 json</td><td><?= $exts['json'] ? '✓' : '✗' ?></td></tr>
+            <tr><td>扩展 curl</td><td><?= $exts['curl'] ? '✓' : '✗' ?></td></tr>
+            <tr><td>扩展 openssl</td><td><?= $exts['openssl'] ? '✓' : '✗' ?></td></tr>
+            <tr><td>memory_limit</td><td><?= htmlspecialchars((string)$memLimit) ?></td></tr>
+            <tr><td>upload_max_filesize</td><td><?= htmlspecialchars((string)$uploadMax) ?></td></tr>
+            <tr><td>post_max_size</td><td><?= htmlspecialchars((string)$postMax) ?></td></tr>
+            <tr><td>max_execution_time</td><td><?= htmlspecialchars((string)$execTime) ?> s</td></tr>
+          </tbody>
+        </table>
+        <?php
+          // DB connectivity test
+          $dbStatus = '未知'; $dbMsg = '';
+          try {
+            $pdoTest = get_pdo();
+            $ok = $pdoTest->query('SELECT 1')->fetchColumn();
+            $dbStatus = ($ok !== false) ? '✓' : '✗';
+          } catch (Throwable $e) { $dbStatus = '✗'; $dbMsg = $e->getMessage(); }
+        ?>
+        <h3 class="mt12 mb8">数据库连接</h3>
+        <table class="table">
+          <thead><tr><th>项</th><th>值</th></tr></thead>
+          <tbody>
+            <tr><td>DB 名称</td><td><?= htmlspecialchars(DB_NAME) ?></td></tr>
+            <tr><td>主机（候选）</td><td><?= htmlspecialchars(is_array(DB_HOSTS)?implode(',', DB_HOSTS): (string)DB_HOSTS) ?></td></tr>
+            <tr><td>连接测试</td><td><?= htmlspecialchars($dbStatus) ?><?= $dbMsg?(' · '.htmlspecialchars($dbMsg)) : '' ?></td></tr>
+          </tbody>
+        </table>
+        <h3 class="mt12 mb8">磁盘使用（<?= htmlspecialchars($diskPath) ?>）</h3>
+        <table class="table">
+          <thead><tr><th>项</th><th>值</th></tr></thead>
+          <tbody>
+            <tr><td>总空间</td><td><?= ($diskTotal!==false)?htmlspecialchars($human($diskTotal)):'N/A' ?></td></tr>
+            <tr><td>已用空间</td><td><?= ($diskUsed!==null)?htmlspecialchars($human($diskUsed)):'N/A' ?></td></tr>
+            <tr><td>可用空间</td><td><?= ($diskFree!==false)?htmlspecialchars($human($diskFree)):'N/A' ?></td></tr>
+          </tbody>
+        </table>
+        <div class="row items-center gap8 mt8">
+          <button class="btn btn-secondary btn-small" id="btn-test-token" type="button">测试令牌</button>
+          <span id="token-test-result" class="small muted"></span>
+        </div>
+      </section>
+      <?php
+        // Recent stock runs (last 5)
+        $recentRuns = [];
+        try {
+          $stmtR = $pdo->query('SELECT run_at, code, updated, unknown, skipped, duration_ms, message FROM stock_logs ORDER BY run_at DESC LIMIT 5');
+          if ($stmtR) { $recentRuns = $stmtR->fetchAll(); }
+        } catch (Throwable $e) { $recentRuns = []; }
+        $errCount = 0; $sumUpdated = 0; $sumUnknown = 0; foreach ($recentRuns as $r) { if ((int)$r['code'] !== 0) { $errCount++; } $sumUpdated += (int)$r['updated']; $sumUnknown += (int)$r['unknown']; }
+      ?>
+      <section class="mb16 panel reveal">
+        <h3 class="mt6 mb8">库存任务最近 5 次运行</h3>
+        <div class="small muted mb6">错误次数：<?= (int)$errCount ?> · 累计更新：<?= (int)$sumUpdated ?> · 累计未知：<?= (int)$sumUnknown ?></div>
+        <table class="table">
+          <thead>
+            <tr><th>时间</th><th>code</th><th>updated</th><th>unknown</th><th>skipped</th><th>耗时(ms)</th><th>消息</th></tr>
+          </thead>
+          <tbody>
+          <?php if ($recentRuns): foreach ($recentRuns as $r): ?>
+            <tr>
+              <td><?= htmlspecialchars((string)$r['run_at']) ?></td>
+              <td><?= (int)$r['code'] ?></td>
+              <td><?= (int)$r['updated'] ?></td>
+              <td><?= (int)$r['unknown'] ?></td>
+              <td><?= (int)$r['skipped'] ?></td>
+              <td><?= (int)$r['duration_ms'] ?></td>
+              <td><?= htmlspecialchars((string)$r['message']) ?></td>
+            </tr>
+          <?php endforeach; else: ?>
+            <tr><td colspan="7" class="small muted">暂无记录</td></tr>
+          <?php endif; ?>
+          </tbody>
+        </table>
+      </section>
+      <section class="mb16 panel reveal">
+        <h3 class="mt6 mb8">库存任务日志（最近 30 行）</h3>
+        <pre class="pre-log"><?= htmlspecialchars($stockTail ?: '无日志或无法读取。') ?></pre>
+        <div class="row items-center gap8 mt8">
+          <form method="post">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
+            <input type="hidden" name="action" value="download_log">
+            <input type="hidden" name="which" value="stock_cron">
+            <button class="btn btn-secondary" type="submit">下载日志</button>
+          </form>
+          <form method="post" data-confirm="清空库存日志？">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
+            <input type="hidden" name="action" value="clear_log">
+            <input type="hidden" name="which" value="stock_cron">
+            <button class="btn btn-danger" type="submit">清空日志</button>
+          </form>
+        </div>
+      </section>
+      <section class="mb24 panel reveal">
+        <h3 class="mt6 mb8">PHP 错误日志（最近 30 行）</h3>
+        <pre class="pre-log"><?= htmlspecialchars($phpTail ?: '无日志或无法读取。') ?></pre>
+        <div class="row items-center gap8 mt8">
+          <form method="post">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
+            <input type="hidden" name="action" value="download_log">
+            <input type="hidden" name="which" value="php_error">
+            <button class="btn btn-secondary" type="submit">下载日志</button>
+          </form>
+          <form method="post" data-confirm="清空 PHP 错误日志？">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf) ?>">
+            <input type="hidden" name="action" value="clear_log">
+            <input type="hidden" name="which" value="php_error">
+            <button class="btn btn-danger" type="submit">清空日志</button>
+          </form>
+        </div>
       </section>
     <?php endif; ?>
   </div>

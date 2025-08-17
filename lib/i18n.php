@@ -49,6 +49,17 @@ function i18n_messages(string $lang): array {
         'sort_storage_asc' => '存储：低到高',
         'filter_button' => '筛选',
         'admin_panel' => '管理后台',
+        // Nav & pages
+        'home' => '首页',
+        'blog' => '博客',
+        'disclaimer' => '免责声明',
+        'privacy' => '隐私保护',
+        'about' => '关于',
+        'about_this_site' => '关于本站',
+        'toggle_theme' => '切换主题',
+        'learn_more' => '了解项目',
+        'footer_tagline' => '聚合 VPS 套餐信息，帮助快速对比选择。',
+        'back_to_top' => '返回顶部',
         'recently_added' => '最近新增',
         'prev_page' => '上一页',
         'next_page' => '下一页',
@@ -93,6 +104,10 @@ function i18n_messages(string $lang): array {
         'export_csv' => '导出CSV',
         'copied' => '已复制',
         'details' => '详情',
+        // UI badges and theme labels
+        'badge_modern_ui' => '现代界面',
+        'brand_link' => 'Link 配色',
+        'brand_ocean' => 'Ocean 配色',
         // Stock labels
         'in_stock' => '有货',
         'out_of_stock' => '无货',
@@ -119,6 +134,17 @@ function i18n_messages(string $lang): array {
         'sort_storage_asc' => 'Storage: Low to High',
         'filter_button' => 'Filter',
         'admin_panel' => 'Admin',
+        // Nav & pages
+        'home' => 'Home',
+        'blog' => 'Blog',
+        'disclaimer' => 'Disclaimer',
+        'privacy' => 'Privacy',
+        'about' => 'About',
+        'about_this_site' => 'About this site',
+        'toggle_theme' => 'Toggle theme',
+        'learn_more' => 'Learn more',
+        'footer_tagline' => 'Aggregate VPS deals for faster, better decisions.',
+        'back_to_top' => 'Back to top',
         'recently_added' => 'Recently Added',
         'prev_page' => 'Prev',
         'next_page' => 'Next',
@@ -163,6 +189,10 @@ function i18n_messages(string $lang): array {
         'export_csv' => 'Export CSV',
         'copied' => 'Copied',
         'details' => 'Details',
+        // UI badges and theme labels
+        'badge_modern_ui' => 'Modern UI',
+        'brand_link' => 'Link',
+        'brand_ocean' => 'Ocean',
         // Stock labels
         'in_stock' => 'In stock',
         'out_of_stock' => 'Out of stock',
@@ -428,6 +458,9 @@ function i18n_text_to_zh(string $text): string {
         'Black Friday' => '黑五',
         'Black Friday Sale' => '黑五特卖',
         'Black Friday Special' => '黑五特惠',
+        'LET Special' => 'LET 特惠',
+        'LET SPECIAL' => 'LET 特惠',
+        'Deals' => '优惠',
         'Campaign' => '促销',
         'Until' => '至',
         'Crypto' => '加密货币',
@@ -533,6 +566,17 @@ function i18n_text_to_en(string $text): string {
     $out = preg_replace('/\/\s*年\b/u', '/ yr', $out);
     // Label words
     $patterns = [
+        // Currency and setup fee phrases
+        '/有\s*([0-9]+(?:\.[0-9]+)?)\s*英镑\s*设置费/u' => '£$1 setup fee',
+        '/有\s*([0-9]+(?:\.[0-9]+)?)\s*美元\s*设置费/u' => '$$1 setup fee',
+        '/有\s*([0-9]+(?:\.[0-9]+)?)\s*欧元\s*设置费/u' => '€$1 setup fee',
+        '/有\s*([0-9]+(?:\.[0-9]+)?)\s*人民币\s*设置费/u' => '¥$1 setup fee',
+        '/\b设置费\b/u' => 'setup fee',
+        // General currency occurrences
+        '/([0-9]+(?:\.[0-9]+)?)\s*英镑/u' => '£$1',
+        '/([0-9]+(?:\.[0-9]+)?)\s*美元/u' => '$$1',
+        '/([0-9]+(?:\.[0-9]+)?)\s*欧元/u' => '€$1',
+        '/([0-9]+(?:\.[0-9]+)?)\s*人民币/u' => '¥$1',
         '/\b年付\b/u' => 'Yearly',
         '/\b月付\b/u' => 'Monthly',
         '/\b内存\b/u' => 'RAM',
