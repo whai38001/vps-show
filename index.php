@@ -16,13 +16,16 @@ send_common_security_headers();
 $q = isset($_GET['q']) ? trim($_GET['q']) : '';
 $vendorId = isset($_GET['vendor']) ? (int)$_GET['vendor'] : 0;
 $billing = isset($_GET['billing']) ? trim($_GET['billing']) : '';
-$stock = isset($_GET['stock']) ? trim($_GET['stock']) : '';
+$stock = isset($_GET['stock']) ? trim($_GET['stock']) : 'in';
 $minPrice = isset($_GET['min_price']) ? (float)$_GET['min_price'] : 0;
 $maxPrice = isset($_GET['max_price']) ? (float)$_GET['max_price'] : 0;
 $location = isset($_GET['location']) ? trim($_GET['location']) : '';
 $minCpu = isset($_GET['min_cpu']) ? (float)$_GET['min_cpu'] : 0;
 $minRamGb = isset($_GET['min_ram_gb']) ? (float)$_GET['min_ram_gb'] : 0;
 $minStorageGb = isset($_GET['min_storage_gb']) ? (int)$_GET['min_storage_gb'] : 0;
+$favoritesOnly = isset($_GET['favorites_only']) && $_GET['favorites_only'] === '1';
+$favoriteIds = isset($_GET['favorite_ids']) ? array_filter(array_map('intval', explode(',', $_GET['favorite_ids']))) : [];
+
 
 $vendors = $pdo->query('SELECT id, name, logo_url, website FROM vendors ORDER BY name ASC')->fetchAll();
 // Distinct non-empty locations for quick filter
@@ -102,10 +105,39 @@ if ($minStorageGb > 0) {
     $where[] = 'p.storage_gb IS NOT NULL AND p.storage_gb >= :min_storage_gb';
     $params[':min_storage_gb'] = $minStorageGb;
 }
-if ($where) {
+if ($favoritesOnly && !empty($favoriteIds)) {
+    // We MUST use positional placeholders. Convert all existing named placeholders.
+    $positionalParams = [];
+    $newWhere = [];
+    
+    foreach($where as $condition) {
+        $newCondition = $condition;
+        if (preg_match_all('/:([a-zA-Z_][a-zA-Z0-9_]*)/', $condition, $matches)) {
+            foreach ($matches[0] as $placeholder) {
+                if (isset($params[$placeholder])) {
+                    $positionalParams[] = $params[$placeholder];
+                }
+            }
+            $newCondition = preg_replace('/:([a-zA-Z_][a-zA-Z0-9_]*)/', '?', $condition);
+        }
+        $newWhere[] = $newCondition;
+    }
+
+    // Add the IN clause for favorite IDs
+    $in = str_repeat('?,', count($favoriteIds) - 1) . '?';
+    $newWhere[] = "p.id IN ($in)";
+    $positionalParams = array_merge($positionalParams, $favoriteIds);
+    
+    // Overwrite with the new positional versions
+    $where = $newWhere;
+    $params = $positionalParams;
+}
+
+if (!empty($where)) {
     $sql .= ' WHERE ' . implode(' AND ', $where);
 }
-$sqlCount = 'SELECT COUNT(*) FROM plans p INNER JOIN vendors v ON v.id = p.vendor_id' . ($where ? (' WHERE ' . implode(' AND ', $where)) : '');
+
+$sqlCount = 'SELECT COUNT(*) FROM plans p INNER JOIN vendors v ON v.id = p.vendor_id' . (!empty($where) ? (' WHERE ' . implode(' AND ', $where)) : '');
 $countStmt = $pdo->prepare($sqlCount);
 $countStmt->execute($params);
 $total = (int)$countStmt->fetchColumn();
@@ -184,13 +216,17 @@ $plans = $stmt->fetchAll();
         <?php
           // Quick toggle: Only in-stock
           $qsIn = $_GET; $qsIn['stock'] = 'in';
-          $qsAll = $_GET; unset($qsAll['stock']);
+          $qsAll = $_GET; $qsAll['stock'] = '';
           $hrefIn = '?' . http_build_query($qsIn);
           $hrefAll = '?' . http_build_query($qsAll);
           $isIn = ($stock === 'in');
         ?>
         <a class="btn <?= $isIn ? '' : 'btn-secondary' ?>" href="<?= htmlspecialchars($hrefIn) ?>"><?= htmlspecialchars(t('in_stock')) ?></a>
         <a class="btn <?= $stock === '' ? '' : 'btn-secondary' ?>" href="<?= htmlspecialchars($hrefAll) ?>"><?= htmlspecialchars(t('filters_all_stock')) ?></a>
+        <label class="row items-center gap6">
+          <input type="checkbox" name="favorites_only" value="1" <?= isset($_GET['favorites_only']) && $_GET['favorites_only'] === '1' ? 'checked' : '' ?> class="js-auto-submit">
+          <span><?= htmlspecialchars(t('favorites_only')) ?></span>
+        </label>
         <select name="billing" class="js-auto-submit">
           <option value=""><?= htmlspecialchars(t('filters_all_billing')) ?></option>
           <?php foreach (['per month'=>t('billing_per_month'),'per year'=>t('billing_per_year'),'one-time'=>t('billing_one_time')] as $k=>$label): ?>
@@ -229,8 +265,8 @@ $plans = $stmt->fetchAll();
         <button class="btn" type="submit"><?= htmlspecialchars(t('filter_button')) ?></button>
         <?php $resetHref = '?' . http_build_query(['lang'=>i18n_current_lang()]); ?>
         <a class="btn btn-secondary" href="<?= htmlspecialchars($resetHref) ?>"><?= htmlspecialchars(t('reset')) ?></a>
-        <a class="btn btn-secondary" href="?<?= htmlspecialchars(http_build_query(['lang'=>i18n_current_lang()])) ?>">清空筛选</a>
         <?php if ($q !== ''): ?><input class="input" type="hidden" name="q" value="<?= htmlspecialchars($q) ?>"><?php endif; ?>
+        <input type="hidden" name="favorite_ids" value="">
       </form>
     </div>
 
@@ -331,6 +367,9 @@ $plans = $stmt->fetchAll();
               <input type="checkbox" class="compare-toggle" aria-label="<?= htmlspecialchars(t('compare')) ?>">
               <span><?= htmlspecialchars(t('compare')) ?></span>
             </label>
+            <button class="btn btn-secondary favorite-toggle" aria-label="<?= htmlspecialchars(t('favorite')) ?>">
+              <span class="favorite-icon"></span>
+            </button>
             <a class="btn order-link" href="<?= htmlspecialchars($plan['order_url'] ?: ($plan['website'] ?? '#')) ?>" target="_blank" rel="nofollow noopener"><?= htmlspecialchars(t('order_now')) ?></a>
           </div>
         </article>

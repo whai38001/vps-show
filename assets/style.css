@@ -486,3 +486,73 @@ label { font-size: 12px; color: #9ca3af; display: block; margin-bottom: 6px; }
 .compare-table th, .compare-table td { vertical-align: top; }
 .compare-table td .features { margin: 0; }
 .compare-table td .features li::before { box-shadow: none; }
+
+/* Favorite Button */
+.favorite-toggle {
+  padding: 0;
+  width: 36px;
+  height: 36px;
+  min-height: 0;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.favorite-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  position: relative;
+  transform: rotate(45deg);
+}
+
+.favorite-icon::before,
+.favorite-icon::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #9ca3af;
+  transition: background .2s ease;
+}
+
+.favorite-icon::before {
+  top: -8px;
+  left: 0;
+}
+
+.favorite-icon::after {
+  top: 0;
+  left: -8px;
+}
+
+.favorite-toggle.active .favorite-icon::before,
+.favorite-toggle.active .favorite-icon::after {
+  background: #f472b6;
+}
+
+.light .favorite-toggle.active .favorite-icon::before,
+.light .favorite-toggle.active .favorite-icon::after {
+    background: #ec4899;
+}
+
+/* Align favorites checkbox in filters */
+.filters form label.row {
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid #1e2536;
+  border-radius: 8px;
+  background: #121622;
+  color: #e5e7eb;
+  cursor: pointer;
+}
+
+.light .filters form label.row {
+  border-color: #d1d5db;
+  background: #ffffff;
+  color: #111827;
+}
+
+.filters form label.row input {
+  margin-right: 8px;
+}

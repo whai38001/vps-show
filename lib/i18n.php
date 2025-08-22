@@ -80,7 +80,7 @@ function i18n_messages(string $lang): array {
         'input_min_cpu' => 'CPU≥',
         'input_min_ram_gb' => '内存≥(GB)',
         'input_min_storage_gb' => '存储≥(GB)',
-        'reset' => '重置',
+        'reset' => '清空筛选',
         'per_page' => '每页',
         'site_title' => SITE_NAME,
         // Compare UI
@@ -113,6 +113,8 @@ function i18n_messages(string $lang): array {
         'out_of_stock' => '无货',
         'unknown' => '未知',
         'stock_status' => '库存状态',
+        'favorite' => '收藏',
+        'favorites_only' => '只看收藏',
     ];
     $EN = [
         'search_placeholder' => 'Search plans or vendors',
@@ -165,7 +167,7 @@ function i18n_messages(string $lang): array {
         'input_min_cpu' => 'CPU≥',
         'input_min_ram_gb' => 'RAM≥(GB)',
         'input_min_storage_gb' => 'Storage≥(GB)',
-        'reset' => 'Reset',
+        'reset' => 'Clear Filters',
         'per_page' => 'Per page',
         'site_title' => SITE_NAME,
         // Compare UI
@@ -198,6 +200,8 @@ function i18n_messages(string $lang): array {
         'out_of_stock' => 'Out of stock',
         'unknown' => 'Unknown',
         'stock_status' => 'Stock status',
+        'favorite' => 'Favorite',
+        'favorites_only' => 'Favorites Only',
     ];
     $cache['zh'] = $ZH; $cache['en'] = $EN;
     return $cache[$lang] ?? $ZH;
@@ -220,6 +224,40 @@ function i18n_duration_label(string $duration): string {
     // Normalize common forms like "/mo", "monthly", "per-month", etc.
     $normalized = preg_replace('/\s+/', ' ', $duration);
     $normalized = str_replace(['per-month','per-monthly','per year','per-year'], ['per month','per month','per year','per year'], $normalized);
+    
+    // Handle specific month/year numbers (e.g., "6 months", "6个月", "3 month")
+    if (preg_match('/(\d+)\s*(?:个月|月|months?)\b/i', $duration, $matches)) {
+        $num = (int)$matches[1];
+        if ($num === 1) {
+            return t('billing_per_month');
+        } elseif ($num === 12) {
+            return t('billing_per_year');
+        } else {
+            // For other numbers, return localized format
+            $lang = i18n_current_lang();
+            if ($lang === 'zh') {
+                return $num . ' 个月';
+            } else {
+                return $num . ' month' . ($num > 1 ? 's' : '');
+            }
+        }
+    }
+    
+    // Handle specific year numbers (e.g., "2 years", "3年")
+    if (preg_match('/(\d+)\s*(?:年|years?)\b/i', $duration, $matches)) {
+        $num = (int)$matches[1];
+        if ($num === 1) {
+            return t('billing_per_year');
+        } else {
+            $lang = i18n_current_lang();
+            if ($lang === 'zh') {
+                return $num . ' 年';
+            } else {
+                return $num . ' year' . ($num > 1 ? 's' : '');
+            }
+        }
+    }
+    
     if (preg_match('/(^|\s)(per month|monthly|mo|\/mo|month)(\s|$)/i', $duration)) {
         return t('billing_per_month');
     }
@@ -230,7 +268,9 @@ function i18n_duration_label(string $duration): string {
         // Map lifetime/one-time to one-time label for simplicity
         return t('billing_one_time');
     }
-    return $duration;
+    
+    // If no pattern matches, apply text translation to handle mixed language content
+    return i18n_text($duration);
 }
 
 function i18n_build_lang_url(string $toLang): string {
@@ -250,6 +290,21 @@ function i18n_text_to_zh(string $text): string {
     $out = $text;
     // Structured patterns first
     $patterns = [
+        // Setup fees and pricing patterns
+        '/\bSetup\s+Fees?\s+([\$£€¥][0-9]+(?:\.[0-9]+)?)/i' => '设置费 $1',
+        '/\bONLY\s+([\$£€¥][0-9]+(?:\.[0-9]+)?)\s+USD\s*\/\s*YEARLY/i' => '仅 $1 美元/年',
+        '/\bOur\s+Price\s*:\s*([\$£€¥][0-9]+(?:\.[0-9]+)?)\s*\/\s*Annually/i' => '我们的价格：$1/年',
+        '/\bPromo\s+Code\s*:\s*([A-Z0-9]+)/i' => '优惠码：$1',
+        '/\bPort\s+25\s+is\s+Blocked\b/i' => '端口 25 被封锁',
+        '/\bPort\s+(\d+)\s+is\s+Blocked\b/i' => '端口 $1 被封锁',
+        // CPU and hardware specifications
+        '/\bIntel\s+Xeon\s+([E0-9v\/\-\s]+)\s+vCPU/i' => 'Intel Xeon $1 vCPU',
+        '/\bEnterprise\s+Hardware\b/i' => '企业级硬件',
+        '/\bAutomatic\s+Setup\b/i' => '自动开通',
+        '/\bDDoS\s+attack\s+protection\s+24\/7\b/i' => '24/7 DDoS 攻击防护',
+        '/\bMultifunctional\s+panel\b/i' => '多功能面板',
+        '/\bLive\s+Stats\b/i' => '实时统计',
+        '/\bGuarantee\s+([0-9]+(?:\.[0-9]+)?%)/i' => '保证 $1',
         // Features: -> 特性：
         '/\bFeatures\s*:/i' => '特性：',
         // rDNS/PTR self-update via panel -> 面板支持 rDNS/PTR 自助更新
@@ -451,6 +506,25 @@ function i18n_text_to_zh(string $text): string {
     $out = preg_replace('/\s{2,}/', ' ', $out);
     // Simple glossary replacements
     $map = [
+        // Pricing and setup terms
+        'Setup Fees' => '设置费',
+        'Setup Fee' => '设置费',
+        'Our Price' => '我们的价格',
+        'Promo Code' => '优惠码',
+        'ONLY' => '仅',
+        'USD' => '美元',
+        'YEARLY' => '年付',
+        'Annually' => '年付',
+        'Port 25 is Blocked' => '端口 25 被封锁',
+        // Hardware and technical terms
+        'Intel Xeon' => 'Intel Xeon',
+        'Enterprise Hardware' => '企业级硬件',
+        'Automatic Setup' => '自动开通',
+        'DDoS attack protection' => 'DDoS 攻击防护',
+        'Multifunctional panel' => '多功能面板',
+        'Live Stats' => '实时统计',
+        'Guarantee' => '保证',
+        // General terms
         'Popular' => '热门',
         'LIMITED STOCK' => '库存有限',
         'Limited Stock' => '库存有限',
@@ -566,6 +640,36 @@ function i18n_text_to_en(string $text): string {
     $out = preg_replace('/\/\s*年\b/u', '/ yr', $out);
     // Label words
     $patterns = [
+        // Network and technical specifications with Chinese units
+        '/([0-9]+(?:\.[0-9]+)?)\s*(Gbps|Mbps|GB|MB|TB)\s*端口/u' => '$1 $2 Port',
+        '/([0-9]+(?:\.[0-9]+)?)\s*(Gbps|Mbps)\s*网络端口/u' => '$1 $2 Network Port',
+        '/([0-9]+(?:\.[0-9]+)?)\s*(GB|MB|TB)\s*内存/u' => '$1 $2 RAM',
+        '/([0-9]+(?:\.[0-9]+)?)\s*(GB|MB|TB)\s*存储/u' => '$1 $2 Storage',
+        '/([0-9]+(?:\.[0-9]+)?)\s*(GB|MB|TB)\s*空间/u' => '$1 $2 Space',
+        '/([0-9]+(?:\.[0-9]+)?)\s*(GB|MB|TB)\s*流量/u' => '$1 $2 Transfer',
+        '/([0-9]+(?:\.[0-9]+)?)\s*vCPU\s*核心/u' => '$1 vCPU Cores',
+        '/([0-9]+(?:\.[0-9]+)?)\s*核心/u' => '$1 Cores',
+        // Duration with price patterns (e.g., "6 月 $3.49" -> "6 months $3.49")
+        // Handle various currency symbols
+        '/(\d+)\s*个月\s*([\$£€¥][0-9]+(?:\.[0-9]+)?)/u' => '$1 months $2',
+        '/(\d+)\s*月\s*([\$£€¥][0-9]+(?:\.[0-9]+)?)/u' => '$1 months $2',
+        '/(\d+)\s*年\s*([\$£€¥][0-9]+(?:\.[0-9]+)?)/u' => '$1 years $2',
+        // Handle special cases for 1 month/year
+        '/1\s*个月\s*([\$£€¥][0-9]+(?:\.[0-9]+)?)/u' => 'Monthly $1',
+        '/1\s*月\s*([\$£€¥][0-9]+(?:\.[0-9]+)?)/u' => 'Monthly $1',
+        '/12\s*个月\s*([\$£€¥][0-9]+(?:\.[0-9]+)?)/u' => 'Yearly $1',
+        '/12\s*月\s*([\$£€¥][0-9]+(?:\.[0-9]+)?)/u' => 'Yearly $1',
+        '/1\s*年\s*([\$£€¥][0-9]+(?:\.[0-9]+)?)/u' => 'Yearly $1',
+        // Standalone duration patterns
+        '/(\d+)\s*个月\b/u' => '$1 months',
+        '/(\d+)\s*月\b/u' => '$1 months',
+        '/(\d+)\s*年\b/u' => '$1 years',
+        // Special cases for standalone durations
+        '/1\s*个月\b/u' => 'Monthly',
+        '/1\s*月\b/u' => 'Monthly',
+        '/12\s*个月\b/u' => 'Yearly',
+        '/12\s*月\b/u' => 'Yearly',
+        '/1\s*年\b/u' => 'Yearly',
         // Currency and setup fee phrases
         '/有\s*([0-9]+(?:\.[0-9]+)?)\s*英镑\s*设置费/u' => '£$1 setup fee',
         '/有\s*([0-9]+(?:\.[0-9]+)?)\s*美元\s*设置费/u' => '$$1 setup fee',
@@ -596,6 +700,33 @@ function i18n_text_to_en(string $text): string {
 
     // City and proper nouns mapping
     $map = [
+        // Technical terms
+        '端口' => 'Port',
+        '网络端口' => 'Network Port',
+        '内存' => 'RAM',
+        '存储' => 'Storage',
+        '空间' => 'Space',
+        '流量' => 'Transfer',
+        '核心' => 'Cores',
+        '处理器' => 'CPU',
+        '虚拟化' => 'Virtualization',
+        '带宽' => 'Bandwidth',
+        '备份' => 'Backup',
+        '快照' => 'Snapshot',
+        '防护' => 'Protection',
+        '面板' => 'Panel',
+        '控制面板' => 'Control Panel',
+        '统计' => 'Stats',
+        '保证' => 'Guarantee',
+        '设置费' => 'Setup Fee',
+        '优惠码' => 'Promo Code',
+        '企业级' => 'Enterprise',
+        '硬件' => 'Hardware',
+        '自动开通' => 'Automatic Setup',
+        '多功能' => 'Multifunctional',
+        '实时' => 'Live',
+        '攻击' => 'Attack',
+        // Cities and locations
         '休斯顿' => 'Houston',
         '洛杉矶' => 'Los Angeles',
         '达拉斯' => 'Dallas',

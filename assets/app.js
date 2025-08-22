@@ -359,10 +359,21 @@
     try{
       document.addEventListener('change', function(e){
         var target = e.target;
-        if(!(target instanceof HTMLSelectElement)) return;
+        if(!(target instanceof HTMLSelectElement) && !(target instanceof HTMLInputElement)) return;
         if(!target.classList.contains('js-auto-submit')) return;
         var form = target.form;
         if(form){
+          var favsOnlyCheckbox = form.querySelector('input[name="favorites_only"]');
+          var favsIdsInput = form.querySelector('input[name="favorite_ids"]');
+          if(favsOnlyCheckbox && favsOnlyCheckbox.checked && favsIdsInput){
+            try{
+              var saved = localStorage.getItem('favorites:selected');
+              if(saved){
+                var ids = JSON.parse(saved);
+                favsIdsInput.value = ids.join(',');
+              }
+            }catch(e){}
+          }
           // Reset page to 1 when per-page or filter changes
           var pageInput = form.querySelector('input[type="number"]');
           if(pageInput){ try{ pageInput.value = '1'; }catch(_e){} }
@@ -396,7 +407,7 @@
   window.addEventListener('scroll', onScroll, {passive:true});
   window.addEventListener('resize', onResize);
   window.addEventListener('orientationchange', onResize);
-  document.addEventListener('DOMContentLoaded', function(){ onResize(); onScroll(); initCompare(); initCspSafeAutoSubmit(); initCspSafeConfirm(); });
+  document.addEventListener('DOMContentLoaded', function(){ onResize(); onScroll(); initCompare(); initCspSafeAutoSubmit(); initCspSafeConfirm(); initFavorites(); });
   // Reveal animation: observe elements and toggle .visible
   try{
     var revealTargets = [];
@@ -415,6 +426,52 @@
       }
     });
   }catch(e){}
+  
+  function initFavorites(){
+    var favoriteIds = new Set();
+    // Restore from localStorage if any
+    try{
+      var saved = localStorage.getItem('favorites:selected');
+      if(saved){ JSON.parse(saved).forEach(function(id){ favoriteIds.add(String(id)); }); }
+    }catch(e){}
+
+    function syncFavoriteButtons(){
+      document.querySelectorAll('.card[data-plan-id]').forEach(function(card){
+        var id = card.getAttribute('data-plan-id');
+        var btn = card.querySelector('.favorite-toggle');
+        if(!btn || !id) return;
+        if(favoriteIds.has(id)){
+          btn.classList.add('active');
+          btn.setAttribute('aria-pressed', 'true');
+        } else {
+          btn.classList.remove('active');
+          btn.setAttribute('aria-pressed', 'false');
+        }
+      });
+      try{ localStorage.setItem('favorites:selected', JSON.stringify(Array.from(favoriteIds))); }catch(e){}
+    }
+
+    // Wire up favorite buttons
+    document.addEventListener('click', function(e){
+      var target = e.target;
+      var btn = target.closest('.favorite-toggle');
+      if(!btn) return;
+
+      var card = btn.closest('.card[data-plan-id]');
+      if(!card) return;
+      var id = card.getAttribute('data-plan-id');
+      if(!id) return;
+      if(favoriteIds.has(id)){
+        favoriteIds.delete(id);
+      } else {
+        favoriteIds.add(id);
+      }
+      syncFavoriteButtons();
+    });
+
+    // Initial sync
+    syncFavoriteButtons();
+  }
   // Back-to-top binding
   try{
     document.addEventListener('DOMContentLoaded', function(){
